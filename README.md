@@ -440,3 +440,26 @@ Query the result with DuckDB:
 import duckdb
 duckdb.sql("SELECT count(*) FROM 'data/raw/TICKERS.parquet'")
 ```
+
+### Identity artifacts (M1)
+
+Once `TICKERS` is ingested:
+
+```bash
+make identity        # or: uv run sharadar-identity --help
+```
+
+builds, under `data/interim/`:
+
+- `ticker_permaticker.parquet` — the canonical ticker↔permaticker mapping
+  (§2), one row per permaticker with its price-coverage window; tickers used
+  by more than one permaticker are flagged.
+- `ticker_reuse.parquet` — only the reused-ticker rows: the raw material for
+  verification task V2.
+- `universe.parquet` — one row per permaticker with the §3 rules expressed as
+  flag columns (`is_common_stock`, `is_financial_sic`, `is_financial_sector`,
+  `siccode_missing`) plus the final `in_universe` verdict, so exclusions stay
+  auditable (V3, V5) rather than silently dropped.
+- `universe_counts_by_year.parquet` / `.csv` and
+  `reports/universe_counts_by_year.png` — in-universe securities per year,
+  split still-listed vs. later-delisted (the M1 exit plot, input to V3).
