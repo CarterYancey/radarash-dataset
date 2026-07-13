@@ -86,6 +86,16 @@ All data comes from **Sharadar via Nasdaq Data Link**:
   latest filing is > 12 months old).
 - Snapshots are generated for every in-universe stock alive on the snapshot date,
   regardless of what happens afterward.
+- **Price-sensitivity augmentation (candidate, see Open Questions):** optionally
+  emit two additional *training-only* rows per (stock, quarter) using the
+  intra-quarter low and high price as the entry point — same fundamentals, two
+  entry valuations, correspondingly different labels. This teaches the
+  margin-of-safety gradient ("this balance sheet at 0.8× book met the criteria;
+  at 1.3× it didn't") directly. Augmented rows are flagged
+  (`snapshot_kind ∈ {close, q_low, q_high}`), receive uniqueness weights like any
+  other overlapping rows, and are **never used in validation/test** — a real
+  portfolio enters at one price, and evaluating on both low and high entries
+  would double-count and flatter precision estimates.
 
 ## 5. Features
 
@@ -101,7 +111,14 @@ Categories (initial set; final list maintained in `docs/features.md`):
    revenue/EPS growth (YoY from ARQ history).
 5. **Technical (small set):** trailing 6m/12m total return, 12m volatility,
    distance from 52-week high, market cap (log).
-6. **Classification columns:** Sharadar sector, industry, Fama-French industry.
+6. **Market-regime (candidate, see Open Questions):** snapshot-date market
+   conditions — e.g., S&P 500 P/S or P/E, trailing market return/volatility.
+   Consistent with the project thesis (deep value *relative to the prevailing
+   regime*), but note the hazard: under temporal splits these are near
+   date-identifiers, letting trees memorize eras in-sample. Include only with a
+   with/without ablation in walk-forward validation; value must be demonstrated
+   across multiple regimes.
+7. **Classification columns:** Sharadar sector, industry, Fama-French industry.
 
 **Feature representation:** every numeric feature is stored twice —
 raw value AND **cross-sectional rank (percentile) within snapshot date**
@@ -182,23 +199,30 @@ cult.
 
 **Serial overlap (same stock, nearby snapshots).** With quarterly snapshots and a
 3y horizon, the 2015-03-31 snapshot's label window (2015-03→2018-03) shares 33 of
-36 months with the 2015-06-30 snapshot's window. The two labels are computed from
-~92% the same price path and the features differ by at most one filing: they are
-effectively the same observation twice. Each stock contributes ~12 near-duplicate
-rows per independent 3y outcome, ~20 per 5y outcome.
+36 months with the 2015-06-30 snapshot's window. The rows are not *duplicates* —
+price-based features move intra-quarter, and because entry price enters the return
+calculation, labels near a threshold can genuinely differ between snapshots. But
+they are *highly correlated*: the dominant variance of a 3y return is the shared
+forward path, not the entry-price difference. Correlated features paired with
+correlated labels is the memorization channel — a model can recognize the
+"AAPL-2015 neighborhood" from any of the sibling rows and recall the mostly-shared
+outcome. Leakage requires correlation, not identity.
 
 **Cross-sectional overlap (different stocks, same date).** All stocks snapshotted
 on the same date have labels driven substantially by the same market path. A good
 2016–2018 shifts *every* 2015 snapshot toward positive labels together. Rows from
 different companies are not independent when their windows coincide.
 
-**Consequence.** Under a random split, nearly every test row has a near-clone in
-train (same stock ± one quarter, or a same-date peer). Approximate memorization
-scores brilliantly; validation metrics become meaningless. This also means the
-**effective sample size is set by the time dimension, not the row count**: with
-~28 years of data (1998→present) there are only ~9 non-overlapping 3y windows and
-~5 non-overlapping 5y windows. This is a small dataset wearing a big dataset's
-row count.
+**Consequence.** Under a random split, nearly every test row has a highly
+correlated sibling in train (same stock ± one quarter, or a same-date peer).
+Approximate memorization scores brilliantly; validation metrics become
+meaningless. This also means the **effective sample size is set by the time
+dimension, not the row count**: with ~28 years of data (1998→present) there are
+only ~9 non-overlapping 3y windows and ~5 non-overlapping 5y windows. This is a
+small dataset wearing a big dataset's row count. Cross-sectional dependence also
+caps evaluation confidence for concentrated portfolios: if the top-K picks in a
+cohort share a factor tilt and a forward window, precision@K on them carries the
+statistical weight of far fewer than K independent bets.
 
 ### 7.2 Mechanics
 
@@ -224,6 +248,18 @@ Full training-eligibility condition per (row, horizon, test period):
 ```
 snapshot_date + horizon + embargo < test_start
 ```
+
+**Within-train overlap vs. cross-boundary overlap.** The rules above police the
+train/test *boundary* only. Overlapping rows **within the training set are kept**
+— purging is a boundary-local cost, not a global one, and across walk-forward
+folds nearly every row trains in some fold. Density within training is instead
+handled by **uniqueness weighting** (de Prado, *AFML* ch. 4): each row carries a
+per-horizon `sample_weight` column ≈ the average uniqueness of its label (a row
+whose window overlaps 11 same-stock siblings weighs ~1/12 of an isolated row).
+Downstream models pass it as a native sample weight. This keeps all data while
+preventing dense periods and long horizons from being overrepresented, and the
+summed weights give an honest effective-sample-size estimate per era as a
+byproduct (published in the QA report).
 
 ### 7.3 Split schemes (tagged in the dataset, consumed downstream)
 
@@ -334,6 +370,13 @@ short writeup in `docs/decisions/`.
 - [ ] Snapshot frequency: quarterly vs. monthly (monthly triples data volume and
       overlap; quarterly is the default until shown insufficient).
 - [ ] Min/max terminal-price labels: keep, or drop after sensitivity analysis?
+- [ ] Price-sensitivity augmentation (q_low/q_high training-only snapshots, §4):
+      adopt in v1, or defer until baseline models exist to measure its effect?
+- [ ] Market-regime features (§5.6): include in v1 feature set (with ablation
+      requirement) or defer?
+- [ ] Uniqueness-weight definition details: exact overlap counting for the
+      `sample_weight` column (de Prado ch. 4), and whether augmented rows share a
+      weight pool with their base row.
 
 ## 11. Milestones
 
