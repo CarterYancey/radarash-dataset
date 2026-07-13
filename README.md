@@ -396,3 +396,47 @@ short writeup in `docs/decisions/`.
 - Portfolio construction / backtesting → `value-ml-models`.
 - Real-time / live data serving.
 - A general-purpose data platform. This is a batch pipeline with a single output.
+
+## 13. Getting started
+
+Dependencies are managed with [uv](https://docs.astral.sh/uv/):
+
+```bash
+uv sync            # create .venv and install dependencies
+make test          # run the test suite
+```
+
+### Ingesting the raw tables (M1)
+
+Set your Nasdaq Data Link API key, then bulk-download everything:
+
+```bash
+export NASDAQ_DATA_LINK_API_KEY=...
+make ingest                          # all seven tables
+make ingest TABLES="TICKERS SEP"     # or a subset
+```
+
+or call the CLI directly for the full option set (`--force`, `--keep-zip`,
+`--no-sort`, `--memory-limit`, ...):
+
+```bash
+uv run sharadar-ingest --help
+```
+
+For each table this requests a bulk export from Nasdaq Data Link, polls until
+it is fresh, downloads the zipped CSV to `data/raw/.staging/`, and converts it
+with DuckDB to `data/raw/<TABLE>.parquet` (ZSTD-compressed, explicitly typed,
+sorted for downstream joins) plus a `data/raw/<TABLE>.meta.json` provenance
+sidecar (source snapshot time, row count, zip sha256). Existing tables are
+skipped unless `--force` is given; interrupt and re-run to resume.
+
+Note on disk: SEP's CSV is temporarily extracted next to the output before
+conversion, so budget roughly zip + CSV + parquet (~40–50 GB free) for the
+initial full run.
+
+Query the result with DuckDB:
+
+```python
+import duckdb
+duckdb.sql("SELECT count(*) FROM 'data/raw/TICKERS.parquet'")
+```
