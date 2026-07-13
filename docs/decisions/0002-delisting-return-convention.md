@@ -5,7 +5,7 @@ Status: accepted
 
 ## Context
 
-README §6 required labels to be computed for every snapshot whose forward
+PLAN.md §6 required labels to be computed for every snapshot whose forward
 window contains a delisting (dropping them reintroduces survivorship bias),
 but left the terminal-value convention open: bankruptcy at −100% vs. final
 price, and acquisitions compounding at the risk-free rate vs. 0%.

@@ -73,7 +73,7 @@ thresholds can be re-derived without recomputation, and the raw terminal
 straight from prices: each `fwd_{H}_*_cagr` equals
 `(fwd_{H}_closeadj_* / entry_closeadj)^(1/H) − 1`.
 
-## Module layout (two-stage, README §6)
+## Module layout (two-stage, PLAN.md §6)
 
 1. **`paths`** — stage 1, path extraction: terminal-window daily price paths
    per (snapshot, horizon), all delisting handling here and only here.

@@ -1,4 +1,4 @@
-"""Universe construction per README §3.
+"""Universe construction per PLAN.md §3.
 
 In: `Domestic Common Stock` and `Domestic Common Stock Primary Class`,
 including delisted stocks (the survivorship-bias point of Sharadar) and REITs.

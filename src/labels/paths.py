@@ -1,4 +1,4 @@
-"""Stage 1 — forward-path extraction (README §6).
+"""Stage 1 — forward-path extraction (PLAN.md §6).
 
 All delisting handling lives here and only here; the label functions in
 `compute` are pure aggregations over these views. v1 endpoint labels only
@@ -27,7 +27,7 @@ HORIZON_YEARS = (1, 2, 3, 5)
 
 # "Terminal-month average": the end value of a horizon-H label is the mean
 # adjusted close over the 21 trading days ENDING at snapshot_date + H
-# (the "or ending at" variant of README §6), damping endpoint noise.
+# (the "or ending at" variant of PLAN.md §6), damping endpoint noise.
 TERMINAL_WINDOW_TRADING_DAYS = 21
 
 

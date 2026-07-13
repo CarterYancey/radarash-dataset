@@ -1,4 +1,4 @@
-"""Stage 2 — label functions over the extracted paths (README §6).
+"""Stage 2 — label functions over the extracted paths (PLAN.md §6).
 
 Pure aggregations: no delisting logic here (that lives in `paths`). For each
 (snapshot, horizon) the terminal window collapses to average / min / max /

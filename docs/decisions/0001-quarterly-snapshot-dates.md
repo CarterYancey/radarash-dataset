@@ -5,7 +5,7 @@ Status: accepted
 
 ## Context
 
-README §4 proposed quarter-end snapshots plus an optional training-only
+PLAN.md §4 proposed quarter-end snapshots plus an optional training-only
 augmentation using intra-quarter low/high entry prices, to teach the
 margin-of-safety gradient directly. Two open questions hung off that design:
 whether to adopt the augmentation in v1, and what the canonical entry price
@@ -33,7 +33,7 @@ entry prices, not synthetic quarter-end rows with substituted prices.
 - Every snapshot has a genuine (date, price) pair, so point-in-time feature
   joins (M2/M4) work identically for all three kinds — no special casing.
 - The three kinds share a quarter's fundamentals but enter at different
-  valuations, teaching the margin-of-safety gradient (README §4's goal).
+  valuations, teaching the margin-of-safety gradient (PLAN.md §4's goal).
 - Snapshot dates are price-derived and therefore not information-free: the
   "low" date is only knowable at quarter end. This is fine for labels
   (forward-looking) and for features (computed as-of the snapshot date), but
