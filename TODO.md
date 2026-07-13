@@ -25,6 +25,13 @@ workspace and findings live in **`docs/research/features.md`** — not here, not
 in README/CLAUDE.md. Flow: research findings → ADRs in `docs/decisions/` →
 canonical registry `docs/features.md` → implementation in `src/features/`.
 
+*Status:* first full research pass done (findings F1–F9 in the workspace);
+ADRs **0003** (composite scores in-house), **0004** (history depth),
+**0005** (v1 scope) drafted in *proposed* status — review, then flip to
+accepted and draft `docs/features.md` from the workspace tables. Remaining
+research questions are data-gated: run the coverage report (workspace §F9)
+against a real ingest.
+
 ## Verification tasks (do these before trusting anything)
 
 Each produces a short writeup in `docs/decisions/`.
@@ -51,6 +58,12 @@ Each produces a short writeup in `docs/decisions/`.
       separate banks/insurers; check feature null rates by sector to confirm the
       exclusion decision (and confirm REIT features are usable).
 - [ ] **V6 — benchmark.** Confirm SFP SPY adjusted close is total-return.
+- [ ] **V7 — DAILY point-in-time safety.** Are historical DAILY rows
+      (marketcap, ev, pe, pb, ps) frozen as-computed, or recomputed after
+      restatements? Compare against hand-computed `SEP.close × ARQ shares`
+      for later-restated filings; check `lastupdated`. Gates whether M4
+      valuation uses DAILY or the self-built PIT construction
+      (`docs/research/features.md` §F8.1).
 
 ## Open questions (decide → ADR in docs/decisions/ → check off)
 
@@ -64,7 +77,10 @@ Each produces a short writeup in `docs/decisions/`.
       rather than exclusion, so downstream can choose.)
 - [ ] Minimum-data filters for snapshots (PLAN.md §3): price on snapshot date
       exists by construction; require an ARQ filing in the trailing 12 months?
-- [ ] Rank features within-date only, or within-date-and-sector?
+- [ ] Rank features within-date only, or within-date-and-sector? *(Reframed
+      by research §F7: touch-date snapshots make exact-date cross-sections
+      thin; proposal is within (calendar quarter, snapshot_kind), sector
+      variant for an allowlist only. Needs its own ADR at registry time.)*
 - [ ] Snapshot frequency: quarterly vs. monthly (monthly triples data volume and
       overlap; quarterly is the default until shown insufficient).
 - [ ] Min/max terminal-price labels: keep, or drop after sensitivity analysis?
