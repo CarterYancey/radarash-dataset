@@ -567,14 +567,25 @@ downstream handle categoricals; no one-hot in the dataset.
 ### F9 — Coverage / null-rate report (the ⛁ unblocker)
 
 First M4 implementation artifact, *before* any feature family: a small
-`src/qa/` (or `src/features/coverage.py`) job over a real ingest producing,
-per year × sector × depth tier: universe count, rows with a usable T0
-filing, T1/T2/T3 chain survival, P12/P36 price-window coverage, and null
-rates for the ~20 highest-value SF1 fields. This single report unblocks
-every ⛁ above (staleness choice, tier viability, G-score variability
-signals, sector-rank allowlist, financials exclusion V5) and doubles as the
-V5 deliverable. Runnable on synthetic fixtures for tests, meaningful on
-real data.
+`src/qa/` job over a real ingest producing, per year × sector × depth tier:
+universe count, rows with a usable T0 filing, T1/T2/T3 chain survival,
+P12/P36 price-window coverage, and null rates for the ~30 highest-value SF1
+fields. This single report unblocks every ⛁ above (staleness choice, tier
+viability, G-score variability signals, sector-rank allowlist, financials
+exclusion V5) and doubles as the V5 deliverable. Runnable on synthetic
+fixtures for tests, meaningful on real data.
+
+**Implemented 2026-07-13** as `src/qa/` / **`sharadar-qa`** (`make qa`),
+three subcommands: `coverage` (this report), `staleness` (§F4.4's
+staleness × label-bias table), `daily-pit` (V7's three diagnostics,
+including the ARQ-vs-MRQ discrimination test on restated rows). Committable
+markdown/CSV outputs land in `docs/research/reports/`; run against a real
+ingest and commit them, then findings graduate here. Note the SF1→
+permaticker resolution rule the QA jobs establish (candidate rule for
+`src/features/base.py`): unique tickers resolve unconditionally; reused
+tickers resolve by price-window containment with grace margins
+(pre-listing 540d for S-1-era filings, post-delisting 366d), nearest
+window on overlap.
 
 ## Reading list / sources
 

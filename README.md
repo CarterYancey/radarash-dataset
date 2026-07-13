@@ -134,6 +134,19 @@ stock-quarter, on the intra-quarter low/median/high touch dates) and
 `labels.parquet` (the full forward-return label matrix per horizon, with
 delisting-aware handling). Column definitions: `docs/labels.md`.
 
+### 4. Run the QA reports (feature-research inputs)
+
+```bash
+make qa              # or: uv run sharadar-qa {coverage,staleness,daily-pit} --help
+```
+
+Three data-gated reports feeding the pre-M4 research questions
+(`docs/research/features.md`): fundamentals coverage / depth-tier survival /
+null rates, staleness vs. label outcomes, and the V7 check on whether
+`DAILY` is point-in-time safe. Detail parquet lands under `data/interim/qa/`;
+committable markdown + CSV summaries under `docs/research/reports/` — commit
+those to share a run's results.
+
 Query any artifact with DuckDB:
 
 ```python

@@ -28,9 +28,10 @@ canonical registry `docs/features.md` → implementation in `src/features/`.
 *Status:* first full research pass done (findings F1–F9 in the workspace);
 ADRs **0003** (composite scores in-house), **0004** (history depth),
 **0005** (v1 scope) drafted in *proposed* status — review, then flip to
-accepted and draft `docs/features.md` from the workspace tables. Remaining
-research questions are data-gated: run the coverage report (workspace §F9)
-against a real ingest.
+accepted (2026-07-13) and draft `docs/features.md` from the workspace tables.
+Remaining research questions are data-gated; the jobs are implemented in
+`src/qa/` — run **`make qa`** against a real ingest and commit the reports it
+drops in `docs/research/reports/`.
 
 ## Verification tasks (do these before trusting anything)
 
