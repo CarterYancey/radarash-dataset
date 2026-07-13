@@ -86,16 +86,18 @@ All data comes from **Sharadar via Nasdaq Data Link**:
   latest filing is > 12 months old).
 - Snapshots are generated for every in-universe stock alive on the snapshot date,
   regardless of what happens afterward.
-- **Price-sensitivity augmentation (candidate, see Open Questions):** optionally
-  emit two additional *training-only* rows per (stock, quarter) using the
-  intra-quarter low and high price as the entry point — same fundamentals, two
-  entry valuations, correspondingly different labels. This teaches the
+- **Snapshot dates (decided, see `docs/decisions/0001`):** each (stock, quarter)
+  emits **three snapshots**, taken on the dates the adjusted close touched its
+  intra-quarter **low**, **median**, and **high** (median = discrete quantile, so
+  always an observed price; earliest date on ties). Same fundamentals, three
+  entry valuations, correspondingly different labels — this teaches the
   margin-of-safety gradient ("this balance sheet at 0.8× book met the criteria;
-  at 1.3× it didn't") directly. Augmented rows are flagged
-  (`snapshot_kind ∈ {close, q_low, q_high}`), receive uniqueness weights like any
-  other overlapping rows, and are **never used in validation/test** — a real
-  portfolio enters at one price, and evaluating on both low and high entries
-  would double-count and flatter precision estimates.
+  at 1.3× it didn't") directly. Rows are flagged
+  (`snapshot_kind ∈ {low, median, high}`), receive uniqueness weights like any
+  other overlapping rows, and the low/high rows are **never used in
+  validation/test** — a real portfolio enters at one price, and evaluating on
+  multiple entries would double-count and flatter precision estimates
+  (enforced by the splits module).
 
 ## 5. Features
 
@@ -160,16 +162,16 @@ Additional stored columns per (snapshot, horizon):
 - `fwd_{H}_min_cagr` / `fwd_{H}_max_cagr` — min/max price over the terminal month
   (pessimistic/optimistic band; cheap to compute, defer judgment on usefulness)
 - `fwd_{H}_excess_cagr` — vs. SPY total return
-- `delisted_in_window` (bool) and `delist_reason`
+- `delisted_in_window_{H}` (varchar) — `'false'` if the stock still traded at the
+  horizon end, otherwise the delist reason itself (no separate reason column);
+  NULL when the horizon is not yet observable.
 
-**Delisting convention:** if a stock delists during the forward window,
-the label MUST still be computed. Default conventions (see Open Questions):
-
-- Bankruptcy/regulatory delisting: terminal value = 0 (−100% return), unless
-  ACTIONS/EVENTS provide a better estimate.
-- Acquisition/merger: terminal value = final adjusted price (cash-out proxy),
-  return then compounds at the risk-free rate (or 0%) to the horizon — decide and
-  document one convention.
+**Delisting convention (decided, see `docs/decisions/0002`):** if a stock
+delists during the forward window, the label MUST still be computed. For all
+delist reasons alike, the position is carried at the **final adjusted trading
+value** (last `closeadj`), compounding at **0%** from the delisting to the
+horizon end. No −100% override for bankruptcies — the final print already
+reflects the market's recovery estimate (V4 audits this).
 
 Dropping delisted-in-window rows is forbidden: it reintroduces survivorship bias
 in the labels even though the underlying data is survivorship-free.
@@ -361,7 +363,8 @@ short writeup in `docs/decisions/`.
 
 ## 10. Open questions (decide, then record in docs/decisions/)
 
-- [ ] Acquisition delisting convention: compound at risk-free vs. 0% vs. drop-with-flag.
+- [x] Acquisition delisting convention: **0%** from the final adjusted value,
+      all delist reasons alike → `docs/decisions/0002`.
 - [ ] Staleness cutoff for fundamentals at snapshot time (6 vs. 12 months).
 - [ ] Minimum liquidity/market-cap floor? (Microcaps dominate a total-market
       universe and may not be investable; consider a `min_marketcap` flag column
@@ -370,8 +373,8 @@ short writeup in `docs/decisions/`.
 - [ ] Snapshot frequency: quarterly vs. monthly (monthly triples data volume and
       overlap; quarterly is the default until shown insufficient).
 - [ ] Min/max terminal-price labels: keep, or drop after sensitivity analysis?
-- [ ] Price-sensitivity augmentation (q_low/q_high training-only snapshots, §4):
-      adopt in v1, or defer until baseline models exist to measure its effect?
+- [x] Price-sensitivity augmentation (§4): adopted in v1 as the three
+      low/median/high touch-date snapshots → `docs/decisions/0001`.
 - [ ] Market-regime features (§5.6): include in v1 feature set (with ablation
       requirement) or defer?
 - [ ] Uniqueness-weight definition details: exact overlap counting for the
@@ -463,3 +466,22 @@ builds, under `data/interim/`:
 - `universe_counts_by_year.parquet` / `.csv` and
   `reports/universe_counts_by_year.png` — in-universe securities per year,
   split still-listed vs. later-delisted (the M1 exit plot, input to V3).
+
+### Snapshots & labels (M3)
+
+Once `SEP`, `SFP`, and `ACTIONS` are ingested and the identity artifacts exist:
+
+```bash
+make labels          # or: uv run sharadar-labels --help
+```
+
+builds, under `data/interim/`:
+
+- `snapshots.parquet` — three snapshots per (permaticker, quarter), taken on
+  the intra-quarter low/median/high touch dates (§4, `docs/decisions/0001`).
+- `labels.parquet` — one row per snapshot: the full §6 label matrix per
+  horizon (terminal-month-average and point-to-point CAGR, min/max band,
+  SPY excess, binary thresholds, `delisted_in_window_{H}`), with the
+  delisting convention of `docs/decisions/0002` applied.
+
+Column-level definitions live in `docs/labels.md`.
