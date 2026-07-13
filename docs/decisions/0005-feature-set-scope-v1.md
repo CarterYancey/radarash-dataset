@@ -1,7 +1,7 @@
 # 0005 — v1 feature-set scope: wide fundamentals + small technical family
 
 Date: 2026-07-13
-Status: proposed
+Status: accepted
 
 ## Context
 

@@ -1,7 +1,7 @@
 # 0003 — Composite scores: compute in-house; store components and composites
 
 Date: 2026-07-13
-Status: proposed
+Status: accepted
 
 ## Context
 

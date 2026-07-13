@@ -1,7 +1,7 @@
 # 0004 — History depth: tiered lookbacks, capped at 3y, no split-rule change
 
 Date: 2026-07-13
-Status: proposed
+Status: accepted
 
 ## Context
 
@@ -21,7 +21,7 @@ split rules. Research notes: `docs/research/features.md` §F4.
    systematically null young/newly-listed firms. Deeper tiers are additive
    registry changes for a future dataset version.
 2. **Multiple depths coexist** as separate columns with separate null
-   policies (e.g. `revenue_growth_1y` and `revenue_growth_3y_cagr`). The
+   policies (e.g. `revenue_growth_1y` and `revenue_growth_3y`). The
    dataset stays label-agnostic: no per-horizon feature sets. Whether long
    -horizon labels are better predicted by long-history features is a
    downstream model-selection question the wide dataset enables.
