@@ -1,0 +1,397 @@
+sector,field,with_filing,null_rate
+(none),assets,25,0.0
+Basic Materials,assets,28935,0.0005
+Communication Services,assets,26037,0.0004
+Consumer Cyclical,assets,65599,0.0007
+Consumer Defensive,assets,25861,0.0003
+Energy,assets,30955,0.0003
+Financial Services,assets,6922,0.0006
+Healthcare,assets,95687,0.0003
+Industrials,assets,77066,0.0004
+Real Estate,assets,29068,0.0001
+Technology,assets,101976,0.0003
+Utilities,assets,12342,0.0003
+(none),assetsc,25,0.88
+Basic Materials,assetsc,28935,0.008
+Communication Services,assetsc,26037,0.031
+Consumer Cyclical,assetsc,65599,0.0548
+Consumer Defensive,assetsc,25861,0.0027
+Energy,assetsc,30955,0.019
+Financial Services,assetsc,6922,0.5498
+Healthcare,assetsc,95687,0.0043
+Industrials,assetsc,77066,0.0492
+Real Estate,assetsc,29068,0.8437
+Technology,assetsc,101976,0.0072
+Utilities,assetsc,12342,0.0185
+(none),capex,25,0.0
+Basic Materials,capex,28935,0.0236
+Communication Services,capex,26037,0.0282
+Consumer Cyclical,capex,65599,0.019
+Consumer Defensive,capex,25861,0.0205
+Energy,capex,30955,0.0311
+Financial Services,capex,6922,0.0149
+Healthcare,capex,95687,0.0268
+Industrials,capex,77066,0.025
+Real Estate,capex,29068,0.0192
+Technology,capex,101976,0.0249
+Utilities,capex,12342,0.0121
+(none),cashneq,25,0.0
+Basic Materials,cashneq,28935,0.0004
+Communication Services,cashneq,26037,0.0003
+Consumer Cyclical,cashneq,65599,0.0005
+Consumer Defensive,cashneq,25861,0.0002
+Energy,cashneq,30955,0.0003
+Financial Services,cashneq,6922,0.0006
+Healthcare,cashneq,95687,0.0003
+Industrials,cashneq,77066,0.0003
+Real Estate,cashneq,29068,0.0
+Technology,cashneq,101976,0.0002
+Utilities,cashneq,12342,0.0002
+(none),cor,25,0.0
+Basic Materials,cor,28935,0.0174
+Communication Services,cor,26037,0.0203
+Consumer Cyclical,cor,65599,0.0133
+Consumer Defensive,cor,25861,0.0117
+Energy,cor,30955,0.0169
+Financial Services,cor,6922,0.0092
+Healthcare,cor,95687,0.0195
+Industrials,cor,77066,0.017
+Real Estate,cor,29068,0.0144
+Technology,cor,101976,0.0182
+Utilities,cor,12342,0.0083
+(none),debt,25,0.0
+Basic Materials,debt,28935,0.0004
+Communication Services,debt,26037,0.0002
+Consumer Cyclical,debt,65599,0.0007
+Consumer Defensive,debt,25861,0.0002
+Energy,debt,30955,0.0002
+Financial Services,debt,6922,0.0
+Healthcare,debt,95687,0.0002
+Industrials,debt,77066,0.0003
+Real Estate,debt,29068,0.0
+Technology,debt,101976,0.0002
+Utilities,debt,12342,0.0002
+(none),depamor,25,0.0
+Basic Materials,depamor,28935,0.0241
+Communication Services,depamor,26037,0.028
+Consumer Cyclical,depamor,65599,0.019
+Consumer Defensive,depamor,25861,0.0206
+Energy,depamor,30955,0.0311
+Financial Services,depamor,6922,0.015
+Healthcare,depamor,95687,0.0271
+Industrials,depamor,77066,0.0251
+Real Estate,depamor,29068,0.0194
+Technology,depamor,101976,0.0258
+Utilities,depamor,12342,0.0121
+(none),ebit,25,0.0
+Basic Materials,ebit,28935,0.0175
+Communication Services,ebit,26037,0.0204
+Consumer Cyclical,ebit,65599,0.0134
+Consumer Defensive,ebit,25861,0.0117
+Energy,ebit,30955,0.017
+Financial Services,ebit,6922,0.0092
+Healthcare,ebit,95687,0.0195
+Industrials,ebit,77066,0.017
+Real Estate,ebit,29068,0.0145
+Technology,ebit,101976,0.0184
+Utilities,ebit,12342,0.0083
+(none),ebitda,25,0.0
+Basic Materials,ebitda,28935,0.0247
+Communication Services,ebitda,26037,0.0285
+Consumer Cyclical,ebitda,65599,0.0198
+Consumer Defensive,ebitda,25861,0.0213
+Energy,ebitda,30955,0.0316
+Financial Services,ebitda,6922,0.0153
+Healthcare,ebitda,95687,0.0277
+Industrials,ebitda,77066,0.0259
+Real Estate,ebitda,29068,0.0203
+Technology,ebitda,101976,0.0265
+Utilities,ebitda,12342,0.013
+(none),equity,25,0.0
+Basic Materials,equity,28935,0.0004
+Communication Services,equity,26037,0.0004
+Consumer Cyclical,equity,65599,0.0005
+Consumer Defensive,equity,25861,0.0002
+Energy,equity,30955,0.0003
+Financial Services,equity,6922,0.0
+Healthcare,equity,95687,0.0002
+Industrials,equity,77066,0.0004
+Real Estate,equity,29068,0.0001
+Technology,equity,101976,0.0002
+Utilities,equity,12342,0.0019
+(none),fcf,25,0.0
+Basic Materials,fcf,28935,0.0247
+Communication Services,fcf,26037,0.0282
+Consumer Cyclical,fcf,65599,0.0193
+Consumer Defensive,fcf,25861,0.0208
+Energy,fcf,30955,0.0312
+Financial Services,fcf,6922,0.015
+Healthcare,fcf,95687,0.0271
+Industrials,fcf,77066,0.0257
+Real Estate,fcf,29068,0.0194
+Technology,fcf,101976,0.0252
+Utilities,fcf,12342,0.0124
+(none),gp,25,0.0
+Basic Materials,gp,28935,0.0174
+Communication Services,gp,26037,0.0203
+Consumer Cyclical,gp,65599,0.0133
+Consumer Defensive,gp,25861,0.0117
+Energy,gp,30955,0.0169
+Financial Services,gp,6922,0.0092
+Healthcare,gp,95687,0.0195
+Industrials,gp,77066,0.017
+Real Estate,gp,29068,0.0144
+Technology,gp,101976,0.0182
+Utilities,gp,12342,0.0083
+(none),intangibles,25,0.0
+Basic Materials,intangibles,28935,0.0004
+Communication Services,intangibles,26037,0.0003
+Consumer Cyclical,intangibles,65599,0.0005
+Consumer Defensive,intangibles,25861,0.0003
+Energy,intangibles,30955,0.0003
+Financial Services,intangibles,6922,0.0004
+Healthcare,intangibles,95687,0.0003
+Industrials,intangibles,77066,0.0004
+Real Estate,intangibles,29068,0.0001
+Technology,intangibles,101976,0.0003
+Utilities,intangibles,12342,0.0003
+(none),intexp,25,0.0
+Basic Materials,intexp,28935,0.0175
+Communication Services,intexp,26037,0.0203
+Consumer Cyclical,intexp,65599,0.0133
+Consumer Defensive,intexp,25861,0.0117
+Energy,intexp,30955,0.017
+Financial Services,intexp,6922,0.0092
+Healthcare,intexp,95687,0.0194
+Industrials,intexp,77066,0.017
+Real Estate,intexp,29068,0.0144
+Technology,intexp,101976,0.0183
+Utilities,intexp,12342,0.0083
+(none),inventory,25,0.0
+Basic Materials,inventory,28935,0.0004
+Communication Services,inventory,26037,0.0003
+Consumer Cyclical,inventory,65599,0.0005
+Consumer Defensive,inventory,25861,0.0002
+Energy,inventory,30955,0.0003
+Financial Services,inventory,6922,0.0004
+Healthcare,inventory,95687,0.0003
+Industrials,inventory,77066,0.0004
+Real Estate,inventory,29068,0.0
+Technology,inventory,101976,0.0002
+Utilities,inventory,12342,0.0003
+(none),liabilities,25,0.0
+Basic Materials,liabilities,28935,0.0004
+Communication Services,liabilities,26037,0.0004
+Consumer Cyclical,liabilities,65599,0.0007
+Consumer Defensive,liabilities,25861,0.0003
+Energy,liabilities,30955,0.0004
+Financial Services,liabilities,6922,0.0001
+Healthcare,liabilities,95687,0.0002
+Industrials,liabilities,77066,0.0004
+Real Estate,liabilities,29068,0.0001
+Technology,liabilities,101976,0.0003
+Utilities,liabilities,12342,0.0019
+(none),liabilitiesc,25,0.88
+Basic Materials,liabilitiesc,28935,0.0143
+Communication Services,liabilitiesc,26037,0.0316
+Consumer Cyclical,liabilitiesc,65599,0.0555
+Consumer Defensive,liabilitiesc,25861,0.0029
+Energy,liabilitiesc,30955,0.0247
+Financial Services,liabilitiesc,6922,0.5498
+Healthcare,liabilitiesc,95687,0.0053
+Industrials,liabilitiesc,77066,0.0405
+Real Estate,liabilitiesc,29068,0.8431
+Technology,liabilitiesc,101976,0.007
+Utilities,liabilitiesc,12342,0.0225
+(none),ncfcommon,25,0.0
+Basic Materials,ncfcommon,28935,0.0243
+Communication Services,ncfcommon,26037,0.0284
+Consumer Cyclical,ncfcommon,65599,0.0193
+Consumer Defensive,ncfcommon,25861,0.0206
+Energy,ncfcommon,30955,0.0314
+Financial Services,ncfcommon,6922,0.0149
+Healthcare,ncfcommon,95687,0.0275
+Industrials,ncfcommon,77066,0.0254
+Real Estate,ncfcommon,29068,0.0193
+Technology,ncfcommon,101976,0.0251
+Utilities,ncfcommon,12342,0.0123
+(none),ncfdebt,25,0.0
+Basic Materials,ncfdebt,28935,0.0242
+Communication Services,ncfdebt,26037,0.0282
+Consumer Cyclical,ncfdebt,65599,0.0192
+Consumer Defensive,ncfdebt,25861,0.0206
+Energy,ncfdebt,30955,0.0311
+Financial Services,ncfdebt,6922,0.0149
+Healthcare,ncfdebt,95687,0.0284
+Industrials,ncfdebt,77066,0.0251
+Real Estate,ncfdebt,29068,0.0193
+Technology,ncfdebt,101976,0.0253
+Utilities,ncfdebt,12342,0.0123
+(none),ncfdiv,25,0.0
+Basic Materials,ncfdiv,28935,0.0262
+Communication Services,ncfdiv,26037,0.029
+Consumer Cyclical,ncfdiv,65599,0.0196
+Consumer Defensive,ncfdiv,25861,0.0208
+Energy,ncfdiv,30955,0.0312
+Financial Services,ncfdiv,6922,0.0149
+Healthcare,ncfdiv,95687,0.0313
+Industrials,ncfdiv,77066,0.0255
+Real Estate,ncfdiv,29068,0.0193
+Technology,ncfdiv,101976,0.0274
+Utilities,ncfdiv,12342,0.0123
+(none),ncfo,25,0.0
+Basic Materials,ncfo,28935,0.0244
+Communication Services,ncfo,26037,0.0281
+Consumer Cyclical,ncfo,65599,0.0193
+Consumer Defensive,ncfo,25861,0.0208
+Energy,ncfo,30955,0.0312
+Financial Services,ncfo,6922,0.015
+Healthcare,ncfo,95687,0.027
+Industrials,ncfo,77066,0.0256
+Real Estate,ncfo,29068,0.0194
+Technology,ncfo,101976,0.0252
+Utilities,ncfo,12342,0.0124
+(none),netinc,25,0.0
+Basic Materials,netinc,28935,0.0175
+Communication Services,netinc,26037,0.0204
+Consumer Cyclical,netinc,65599,0.0134
+Consumer Defensive,netinc,25861,0.0117
+Energy,netinc,30955,0.017
+Financial Services,netinc,6922,0.0092
+Healthcare,netinc,95687,0.0195
+Industrials,netinc,77066,0.017
+Real Estate,netinc,29068,0.0145
+Technology,netinc,101976,0.0184
+Utilities,netinc,12342,0.0083
+(none),payables,25,0.0
+Basic Materials,payables,28935,0.0004
+Communication Services,payables,26037,0.0002
+Consumer Cyclical,payables,65599,0.0007
+Consumer Defensive,payables,25861,0.0002
+Energy,payables,30955,0.0002
+Financial Services,payables,6922,0.0001
+Healthcare,payables,95687,0.0002
+Industrials,payables,77066,0.0003
+Real Estate,payables,29068,0.0
+Technology,payables,101976,0.0002
+Utilities,payables,12342,0.0002
+(none),ppnenet,25,0.0
+Basic Materials,ppnenet,28935,0.0004
+Communication Services,ppnenet,26037,0.0003
+Consumer Cyclical,ppnenet,65599,0.0005
+Consumer Defensive,ppnenet,25861,0.0002
+Energy,ppnenet,30955,0.0003
+Financial Services,ppnenet,6922,0.0004
+Healthcare,ppnenet,95687,0.0003
+Industrials,ppnenet,77066,0.0004
+Real Estate,ppnenet,29068,0.0
+Technology,ppnenet,101976,0.0002
+Utilities,ppnenet,12342,0.0003
+(none),receivables,25,0.0
+Basic Materials,receivables,28935,0.0004
+Communication Services,receivables,26037,0.0003
+Consumer Cyclical,receivables,65599,0.0005
+Consumer Defensive,receivables,25861,0.0002
+Energy,receivables,30955,0.0003
+Financial Services,receivables,6922,0.0004
+Healthcare,receivables,95687,0.0003
+Industrials,receivables,77066,0.0004
+Real Estate,receivables,29068,0.0001
+Technology,receivables,101976,0.0002
+Utilities,receivables,12342,0.0003
+(none),retearn,25,0.0
+Basic Materials,retearn,28935,0.0769
+Communication Services,retearn,26037,0.0106
+Consumer Cyclical,retearn,65599,0.0339
+Consumer Defensive,retearn,25861,0.0176
+Energy,retearn,30955,0.2042
+Financial Services,retearn,6922,0.0303
+Healthcare,retearn,95687,0.0124
+Industrials,retearn,77066,0.0257
+Real Estate,retearn,29068,0.0493
+Technology,retearn,101976,0.0153
+Utilities,retearn,12342,0.137
+(none),revenue,25,0.0
+Basic Materials,revenue,28935,0.0174
+Communication Services,revenue,26037,0.0203
+Consumer Cyclical,revenue,65599,0.0133
+Consumer Defensive,revenue,25861,0.0117
+Energy,revenue,30955,0.0169
+Financial Services,revenue,6922,0.0092
+Healthcare,revenue,95687,0.0195
+Industrials,revenue,77066,0.017
+Real Estate,revenue,29068,0.0144
+Technology,revenue,101976,0.0182
+Utilities,revenue,12342,0.0083
+(none),rnd,25,0.0
+Basic Materials,rnd,28935,0.0174
+Communication Services,rnd,26037,0.0204
+Consumer Cyclical,rnd,65599,0.0134
+Consumer Defensive,rnd,25861,0.0117
+Energy,rnd,30955,0.017
+Financial Services,rnd,6922,0.0092
+Healthcare,rnd,95687,0.0195
+Industrials,rnd,77066,0.017
+Real Estate,rnd,29068,0.0145
+Technology,rnd,101976,0.0183
+Utilities,rnd,12342,0.0083
+(none),sgna,25,0.0
+Basic Materials,sgna,28935,0.0174
+Communication Services,sgna,26037,0.0203
+Consumer Cyclical,sgna,65599,0.0133
+Consumer Defensive,sgna,25861,0.0117
+Energy,sgna,30955,0.017
+Financial Services,sgna,6922,0.0091
+Healthcare,sgna,95687,0.0194
+Industrials,sgna,77066,0.017
+Real Estate,sgna,29068,0.0144
+Technology,sgna,101976,0.0182
+Utilities,sgna,12342,0.0083
+(none),sharefactor,25,0.0
+Basic Materials,sharefactor,28935,0.0
+Communication Services,sharefactor,26037,0.0
+Consumer Cyclical,sharefactor,65599,0.0
+Consumer Defensive,sharefactor,25861,0.0
+Energy,sharefactor,30955,0.0
+Financial Services,sharefactor,6922,0.0
+Healthcare,sharefactor,95687,0.0
+Industrials,sharefactor,77066,0.0
+Real Estate,sharefactor,29068,0.0
+Technology,sharefactor,101976,0.0
+Utilities,sharefactor,12342,0.0
+(none),sharesbas,25,0.0
+Basic Materials,sharesbas,28935,0.0004
+Communication Services,sharesbas,26037,0.0008
+Consumer Cyclical,sharesbas,65599,0.0004
+Consumer Defensive,sharesbas,25861,0.0006
+Energy,sharesbas,30955,0.0007
+Financial Services,sharesbas,6922,0.0003
+Healthcare,sharesbas,95687,0.0003
+Industrials,sharesbas,77066,0.0003
+Real Estate,sharesbas,29068,0.0003
+Technology,sharesbas,101976,0.0005
+Utilities,sharesbas,12342,0.0008
+(none),taxexp,25,0.0
+Basic Materials,taxexp,28935,0.0174
+Communication Services,taxexp,26037,0.0204
+Consumer Cyclical,taxexp,65599,0.0134
+Consumer Defensive,taxexp,25861,0.0117
+Energy,taxexp,30955,0.017
+Financial Services,taxexp,6922,0.0092
+Healthcare,taxexp,95687,0.0195
+Industrials,taxexp,77066,0.017
+Real Estate,taxexp,29068,0.0145
+Technology,taxexp,101976,0.0183
+Utilities,taxexp,12342,0.0083
+(none),workingcapital,25,0.88
+Basic Materials,workingcapital,28935,0.0153
+Communication Services,workingcapital,26037,0.0331
+Consumer Cyclical,workingcapital,65599,0.0564
+Consumer Defensive,workingcapital,25861,0.0043
+Energy,workingcapital,30955,0.0257
+Financial Services,workingcapital,6922,0.5532
+Healthcare,workingcapital,95687,0.0073
+Industrials,workingcapital,77066,0.0535
+Real Estate,workingcapital,29068,0.844
+Technology,workingcapital,101976,0.0087
+Utilities,workingcapital,12342,0.0237
