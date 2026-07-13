@@ -7,7 +7,7 @@ Produces under data/interim/:
 
     ticker_permaticker.parquet        canonical mapping, reuse flagged
     ticker_reuse.parquet              V2 raw material
-    universe.parquet                  README §3 flags + in_universe verdict
+    universe.parquet                  PLAN.md §3 flags + in_universe verdict
     universe_counts_by_year.parquet   per-year counts (also as .csv)
     reports/universe_counts_by_year.png
 """

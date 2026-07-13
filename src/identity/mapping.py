@@ -1,4 +1,4 @@
-"""Ticker ↔ permaticker mapping — the first pipeline artifact (README §2).
+"""Ticker ↔ permaticker mapping — the first pipeline artifact (PLAN.md §2).
 
 `permaticker` is the canonical entity key; `ticker` is a join key only.
 Ticker reuse (one ticker string used by several permatickers over time) is
