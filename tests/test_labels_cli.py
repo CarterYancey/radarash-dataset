@@ -242,6 +242,44 @@ def test_zigzag_delisting_convention(labels_world):
     assert (ge0, ge5, beat) == (True, False, False)
 
 
+def test_terminal_price_columns(labels_world):
+    # ZIG low snapshot: the whole terminal window is the frozen final close,
+    # so every terminal price collapses to exactly 30.
+    row = one_row(
+        labels_world,
+        "labels",
+        """
+        SELECT fwd_1y_closeadj_avg, fwd_1y_closeadj_p2p,
+               fwd_1y_closeadj_min, fwd_1y_closeadj_max,
+               fwd_1y_spy_cagr, fwd_1y_cagr, fwd_1y_excess_cagr
+        FROM {t} WHERE permaticker = 300003 AND snapshot_kind = 'low'
+        """,
+    )
+    avg, p2p, mn, mx, spy, cagr, excess = row
+    assert avg == p2p == mn == mx == pytest.approx(30.0)
+    assert 0.070 < spy < 0.080  # SPY at 8%/yr under the averaging convention
+    assert excess == pytest.approx(cagr - spy)
+
+    # GROW rises monotonically: the window max is its last close (= p2p),
+    # and each stored CAGR must be re-derivable from its stored price.
+    row = one_row(
+        labels_world,
+        "labels",
+        """
+        SELECT entry_closeadj, fwd_1y_closeadj_avg, fwd_1y_closeadj_p2p,
+               fwd_1y_closeadj_min, fwd_1y_closeadj_max,
+               fwd_1y_cagr, fwd_1y_cagr_p2p
+        FROM {t} WHERE permaticker = 300001
+          AND snapshot_kind = 'median' AND quarter = DATE '2016-01-01'
+        """,
+    )
+    entry, avg, p2p, mn, mx, cagr, cagr_p2p = row
+    assert mn < avg < mx
+    assert mx == pytest.approx(p2p)
+    assert cagr == pytest.approx(avg / entry - 1)
+    assert cagr_p2p == pytest.approx(p2p / entry - 1)
+
+
 def test_dead_delisted_in_window_and_reason_priority(labels_world):
     row = one_row(
         labels_world,
@@ -296,12 +334,13 @@ def test_unobservable_horizons_are_null(labels_world):
         labels_world,
         "labels",
         """
-        SELECT fwd_1y_cagr, delisted_in_window_1y, fwd_5y_cagr
+        SELECT fwd_1y_cagr, delisted_in_window_1y, fwd_5y_cagr,
+               fwd_1y_closeadj_avg, fwd_1y_spy_cagr
         FROM {t} WHERE permaticker = 300001
           AND snapshot_kind = 'high' AND quarter = DATE '2021-10-01'
         """,
     )
-    assert row == (None, None, None)
+    assert row == (None, None, None, None, None)
 
     # Boundary: the 2020-Q4 high snapshot (2020-12-31) targets exactly the
     # last calendar day (2021-12-31) -> observable.

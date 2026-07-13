@@ -50,11 +50,16 @@ Keys and entry metadata as in `snapshots.parquet`, then per horizon `{H}`:
 
 | column | type | meaning |
 |---|---|---|
+| `fwd_{H}_closeadj_avg` | double | mean adjusted close over the terminal window |
+| `fwd_{H}_closeadj_p2p` | double | adjusted close on the horizon-end day |
+| `fwd_{H}_closeadj_min` | double | terminal-window minimum adjusted close |
+| `fwd_{H}_closeadj_max` | double | terminal-window maximum adjusted close |
 | `fwd_{H}_cagr` | double | terminal-month-average CAGR |
 | `fwd_{H}_cagr_p2p` | double | point-to-point CAGR (endpoint-noise control) |
 | `fwd_{H}_min_cagr` | double | CAGR to the terminal-window minimum |
 | `fwd_{H}_max_cagr` | double | CAGR to the terminal-window maximum |
-| `fwd_{H}_excess_cagr` | double | `fwd_{H}_cagr` − SPY CAGR, same convention |
+| `fwd_{H}_spy_cagr` | double | SPY CAGR over the same window, same convention |
+| `fwd_{H}_excess_cagr` | double | `fwd_{H}_cagr` − `fwd_{H}_spy_cagr` |
 | `label_{H}_cagr_ge_0` | bool | `fwd_{H}_cagr ≥ 0%` |
 | `label_{H}_cagr_ge_5` | bool | `fwd_{H}_cagr ≥ 5%` |
 | `label_{H}_cagr_ge_8` | bool | `fwd_{H}_cagr ≥ 8%` |
@@ -63,7 +68,10 @@ Keys and entry metadata as in `snapshots.parquet`, then per horizon `{H}`:
 | `delisted_in_window_{H}` | varchar | `'false'`, or the delist reason (decision 0002); NULL = horizon unobservable |
 
 Binary thresholds are inclusive (`≥`). Continuous CAGRs are stored so
-thresholds can be re-derived without recomputation.
+thresholds can be re-derived without recomputation, and the raw terminal
+`closeadj` values so every CAGR can be re-derived (or re-conventioned)
+straight from prices: each `fwd_{H}_*_cagr` equals
+`(fwd_{H}_closeadj_* / entry_closeadj)^(1/H) − 1`.
 
 ## Module layout (two-stage, README §6)
 

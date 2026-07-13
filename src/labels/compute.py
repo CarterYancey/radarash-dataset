@@ -65,6 +65,10 @@ def build_label_views(
         cagrs AS (
             SELECT st.permaticker, st.snapshot_date, st.snapshot_kind,
                    st.horizon_years, st.horizon_end,
+                   st.terminal_avg AS closeadj_avg,
+                   st.terminal_close AS closeadj_p2p,
+                   st.terminal_min AS closeadj_min,
+                   st.terminal_max AS closeadj_max,
                    pow(st.terminal_avg / s.entry_closeadj,
                        1.0 / st.horizon_years) - 1 AS fwd_cagr,
                    pow(st.terminal_close / s.entry_closeadj,
@@ -84,7 +88,9 @@ def build_label_views(
         )
         SELECT permaticker, snapshot_date, snapshot_kind, horizon_years,
                horizon_end,
+               closeadj_avg, closeadj_p2p, closeadj_min, closeadj_max,
                fwd_cagr, fwd_cagr_p2p, fwd_min_cagr, fwd_max_cagr,
+               spy_cagr,
                fwd_cagr - spy_cagr AS fwd_excess_cagr,
                {threshold_cols},
                fwd_cagr > spy_cagr AS beat_spy,
@@ -102,10 +108,15 @@ def build_label_views(
         tag = f"{int(h)}y"
         flt = f"FILTER (WHERE l.horizon_years = {int(h)})"
         cols = [
+            f"any_value(l.closeadj_avg) {flt} AS fwd_{tag}_closeadj_avg",
+            f"any_value(l.closeadj_p2p) {flt} AS fwd_{tag}_closeadj_p2p",
+            f"any_value(l.closeadj_min) {flt} AS fwd_{tag}_closeadj_min",
+            f"any_value(l.closeadj_max) {flt} AS fwd_{tag}_closeadj_max",
             f"any_value(l.fwd_cagr) {flt} AS fwd_{tag}_cagr",
             f"any_value(l.fwd_cagr_p2p) {flt} AS fwd_{tag}_cagr_p2p",
             f"any_value(l.fwd_min_cagr) {flt} AS fwd_{tag}_min_cagr",
             f"any_value(l.fwd_max_cagr) {flt} AS fwd_{tag}_max_cagr",
+            f"any_value(l.spy_cagr) {flt} AS fwd_{tag}_spy_cagr",
             f"any_value(l.fwd_excess_cagr) {flt} AS fwd_{tag}_excess_cagr",
             *(
                 f"any_value(l.cagr_ge_{pct}) {flt} AS label_{tag}_cagr_ge_{pct}"
