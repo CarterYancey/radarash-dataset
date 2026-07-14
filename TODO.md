@@ -5,19 +5,19 @@ rationale belong in [PLAN.md](PLAN.md) and `docs/research/`.
 
 ## Next: feature research and design
 
+- [x] Resolve feature breadth, composite-score, history-window, technical-family,
+      representation, and independent-versioning policies.
+- [x] Establish the family-level canonical registry in `docs/features.md`.
 - [ ] Inventory every usable ARQ/ART, DAILY, and SEP source field with units,
       availability date, expected sign/range, and known Sharadar caveats.
-- [ ] Create one research note per proposed feature family using the template in
-      `docs/research/features/_template.md`.
-- [ ] Define the initial feature registry in
-      `docs/research/features/registry.md`.
+- [ ] Expand researched families in `docs/features.md` into atomic definitions.
 - [ ] Establish denominator, zero, negative-value, winsorization, and infinity
       policies before implementing ratios.
 - [ ] Hand-check representative feature calculations against filings and known
       formulas.
-- [ ] Decide the first baseline feature set after reviewing evidence and source
-      coverage.
-- [ ] Record accepted feature definitions in `docs/decisions/`.
+- [ ] Measure coverage and choose which specified features enter feature set v1.
+- [ ] Record any remaining material conventions in `docs/decisions/` and mark
+      exact definitions accepted before feature code is written.
 
 ## Point-in-time foundation
 

@@ -17,7 +17,7 @@ Then read only what the task needs:
 |---|---|
 | Identity or universe | `docs/decisions/0001-*.md`, `0002-*.md` |
 | Labels | `docs/labels.md`, `docs/decisions/0003-*.md` |
-| Features | feature section of `PLAN.md`, then `docs/research/features/` |
+| Features | `docs/research/features.md`, ADRs 0004–0006, then `docs/features.md` |
 | Point-in-time joins | point-in-time section of `PLAN.md` |
 | Splits | temporal validation section of `PLAN.md` |
 | New convention | relevant research plus a new `docs/decisions/NNNN-*.md` |
@@ -49,6 +49,10 @@ Individual CLIs are `sharadar-ingest`, `sharadar-identity`, and
   `reportperiod`; use ARQ/ART, never MRQ/MRT/MRY.
 - Missing feature values remain null unless a documented feature explicitly
   defines another value.
+- Do not implement a feature until its canonical `docs/features.md` status is
+  accepted.
+- Features and labels are independently versioned; label horizon never changes
+  a feature definition implicitly.
 - Do not silently drop rows with unavailable future labels; recent horizons are
   expected to be null.
 - Do not randomly split rows. Temporal split logic must purge overlapping label
@@ -114,7 +118,8 @@ For implementation changes:
 - `AGENTS.md`: implementation orientation and invariants.
 - `TODO.md`: concrete work, ordered roughly by priority.
 - `PLAN.md`: conceptual design, research questions, and validation strategy.
-- `docs/research/`: evidence, formulas, comparisons, and exploratory findings.
+- `docs/research/features.md`: feature evidence, comparisons, and open findings.
+- `docs/features.md`: canonical definitions and review status.
 - `docs/decisions/`: accepted decisions and their rationale.
 - module docs such as `docs/labels.md`: exact produced-data contracts.
 

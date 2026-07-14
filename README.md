@@ -71,7 +71,8 @@ src/
   qa/                  planned and stage-specific data-quality reports
 docs/
   decisions/           accepted architecture and modeling decisions
-  research/features/   feature research notes and registry
+  research/features.md feature-set evidence and planning
+  features.md          canonical feature registry
 tests/                 fixture-based tests
 ```
 
@@ -152,7 +153,8 @@ GROUP BY snapshot_kind;
 - [PLAN.md](PLAN.md): conceptual design and research strategy
 - [docs/labels.md](docs/labels.md): exact label conventions
 - [docs/decisions/](docs/decisions/): accepted decision records
-- [docs/research/features/](docs/research/features/): feature research workspace
+- [docs/research/features.md](docs/research/features.md): feature-set research
+- [docs/features.md](docs/features.md): canonical feature registry
 
 ## Non-goals
 

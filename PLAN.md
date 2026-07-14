@@ -96,10 +96,11 @@ Feature development begins with research, not formula transcription. Every
 candidate must establish economic meaning, point-in-time computability,
 cross-sectional comparability, source coverage, and numerical behavior.
 
-Research artifacts live under `docs/research/features/`. The registry is the
-index; individual notes contain evidence and exploratory results. A formula is
-not implementation-ready until its registry status is accepted and any
-material convention has a decision record.
+Research and source evidence live in `docs/research/features.md`; the sole
+canonical registry is `docs/features.md`. A formula is not implementation-ready
+until its registry status is accepted and any material convention has a
+decision record. ADRs 0004–0006 resolve scope, composite-score, history, and
+versioning policy.
 
 ### Evaluation criteria
 
@@ -126,7 +127,8 @@ For each feature, determine:
 
 ### Candidate families
 
-These are research areas, not an approved feature list:
+These are research areas, not an approved feature list. The maintained list and
+review status are in `docs/features.md`:
 
 - valuation: earnings, book, sales, cash-flow, and enterprise-value yields;
 - solvency and distress: working capital, retained earnings, leverage,
@@ -142,10 +144,9 @@ These are research areas, not an approved feature list:
   continuity;
 - optional regime context: broad-market valuation, trend, and volatility.
 
-Composite scores such as Piotroski F-score, Altman Z-score, Ohlson O-score,
-Beneish M-score, and Magic Formula ranks should first be decomposed into their
-components. Components preserve information and make missingness visible;
-composites can then be retained as interpretable benchmarks.
+Composite scores are decomposed first. Exact published composites may be
+retained as reference features when complete and reproducible. Custom learned
+scores belong downstream inside temporal training folds. See ADR 0005.
 
 ### Representation
 
@@ -174,7 +175,7 @@ The preferred sequence is:
 4. prototype DuckDB expressions;
 5. coverage and distribution reports;
 6. alternate-definition sensitivity analysis;
-7. registry review and accepted definition;
+7. atomic specification in `docs/features.md`, registry review, and acceptance;
 8. implementation with fixtures and full-data QA.
 
 Do not use label correlation on the final holdout to select features. Early
