@@ -1,7 +1,7 @@
 # 0008 — Rank representation: percent_rank within (quarter, snapshot_kind)
 
 Date: 2026-07-14
-Status: proposed
+Status: accepted
 
 ## Context
 

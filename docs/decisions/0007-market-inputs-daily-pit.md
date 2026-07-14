@@ -1,7 +1,7 @@
 # 0007 — Market inputs: self-built SEP × ARQ is canonical; DAILY is a cross-check (V7)
 
 Date: 2026-07-14
-Status: proposed
+Status: accepted
 
 ## Context
 

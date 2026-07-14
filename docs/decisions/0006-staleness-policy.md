@@ -1,7 +1,7 @@
 # 0006 — Staleness: no feature-level cutoff; age is a feature, cutoffs are flags
 
 Date: 2026-07-14
-Status: proposed
+Status: accepted
 
 ## Context
 
