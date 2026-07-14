@@ -25,13 +25,15 @@ workspace and findings live in **`docs/research/features.md`** — not here, not
 in README/CLAUDE.md. Flow: research findings → ADRs in `docs/decisions/` →
 canonical registry `docs/features.md` → implementation in `src/features/`.
 
-*Status:* first full research pass done (findings F1–F9 in the workspace);
-ADRs **0003** (composite scores in-house), **0004** (history depth),
-**0005** (v1 scope) drafted in *proposed* status — review, then flip to
-accepted (2026-07-13) and draft `docs/features.md` from the workspace tables.
-Remaining research questions are data-gated; the jobs are implemented in
-`src/qa/` — run **`make qa`** against a real ingest and commit the reports it
-drops in `docs/research/reports/`.
+*Status:* research phase complete pending final ADR review. Findings F1–F9
+(2026-07-13) closed the theory questions; ADRs **0003/0004/0005** accepted.
+`make qa` ran against a real ingest (reports committed in
+`docs/research/reports/`, distilled into findings **F10–F12**), closing the
+data-gated questions; ADRs **0006** (staleness), **0007** (market inputs /
+V7), **0008** (rank representation) drafted in *proposed* status, and the
+canonical registry **`docs/features.md`** is drafted. Review 0006–0008 →
+flip to accepted → registry becomes canonical → implement `src/features/`
+in the registry's build order.
 
 ## Verification tasks (do these before trusting anything)
 
@@ -58,13 +60,17 @@ Each produces a short writeup in `docs/decisions/`.
 - [ ] **V5 — financials identification.** Verify sector/SIC filters cleanly
       separate banks/insurers; check feature null rates by sector to confirm the
       exclusion decision (and confirm REIT features are usable).
+      *(REIT half done via the coverage report, research §F10: REIT features
+      usable except classified-balance-sheet inputs, ~84% NULL by
+      construction. Bank/insurer separation still open.)*
 - [ ] **V6 — benchmark.** Confirm SFP SPY adjusted close is total-return.
-- [ ] **V7 — DAILY point-in-time safety.** Are historical DAILY rows
-      (marketcap, ev, pe, pb, ps) frozen as-computed, or recomputed after
-      restatements? Compare against hand-computed `SEP.close × ARQ shares`
-      for later-restated filings; check `lastupdated`. Gates whether M4
-      valuation uses DAILY or the self-built PIT construction
-      (`docs/research/features.md` §F8.1).
+- [x] **V7 — DAILY point-in-time safety.** Ran via `sharadar-qa daily-pit`:
+      DAILY was wholesale re-stamped (~2019) so "frozen" can't be certified,
+      but values behave as-reported (85.9% ARQ-sided on restated rows, flat
+      across years) and our `SEP.close × ARQ shares` construction replicates
+      it to <0.1% median error. Writeup + decision (self-built canonical,
+      DAILY cross-check only): `docs/decisions/0007` *(proposed)*; results
+      in research §F12.
 
 ## Open questions (decide → ADR in docs/decisions/ → check off)
 
@@ -72,16 +78,21 @@ Each produces a short writeup in `docs/decisions/`.
       all delist reasons alike → `docs/decisions/0002`.
 - [x] Price-sensitivity augmentation (PLAN.md §4): adopted in v1 as the three
       low/median/high touch-date snapshots → `docs/decisions/0001`.
-- [ ] Staleness cutoff for fundamentals at snapshot time (6 vs. 12 months).
+- [x] Staleness cutoff for fundamentals at snapshot time: **no cutoff** —
+      age is a feature, cutoffs are flag columns → `docs/decisions/0006`
+      *(proposed; data in research §F11)*.
 - [ ] Minimum liquidity/market-cap floor? (Microcaps dominate a total-market
       universe and may not be investable; consider a `min_marketcap` flag column
-      rather than exclusion, so downstream can choose.)
-- [ ] Minimum-data filters for snapshots (PLAN.md §3): price on snapshot date
-      exists by construction; require an ARQ filing in the trailing 12 months?
-- [ ] Rank features within-date only, or within-date-and-sector? *(Reframed
-      by research §F7: touch-date snapshots make exact-date cross-sections
-      thin; proposal is within (calendar quarter, snapshot_kind), sector
-      variant for an allowlist only. Needs its own ADR at registry time.)*
+      rather than exclusion, so downstream can choose. The registry's
+      `dollar_volume_3m`/`amihud_12m` columns carry the liquidity side;
+      the flag-column decision itself is still open.)
+- [x] Minimum-data filters for snapshots (PLAN.md §3): **no filing
+      requirement** — `has_filing_183d`/`has_filing_365d` flags instead
+      → folded into `docs/decisions/0006` *(proposed)*.
+- [x] Rank features within-date only, or within-date-and-sector?
+      **Within (calendar quarter, snapshot_kind)**, `percent_rank`,
+      thin-slice guard 20; sector variant for an allowlist
+      → `docs/decisions/0008` *(proposed; research §F7 + §F10)*.
 - [ ] Snapshot frequency: quarterly vs. monthly (monthly triples data volume and
       overlap; quarterly is the default until shown insufficient).
 - [ ] Min/max terminal-price labels: keep, or drop after sensitivity analysis?

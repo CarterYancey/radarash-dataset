@@ -12,13 +12,21 @@ findings here → ADR in docs/decisions/ → canonical registry docs/features.md
 Starting scope is PLAN.md §5 (seven families + the rank-representation rule).
 Nothing below is decided until it has an ADR.
 
-Status 2026-07-13: first full research pass done (findings F1–F9 below).
-Three ADRs drafted in **proposed** status awaiting review:
-[0003](../decisions/0003-composite-scores-in-house.md) (composite scores),
-[0004](../decisions/0004-fundamental-history-depth.md) (history depth),
-[0005](../decisions/0005-feature-set-scope-v1.md) (v1 scope).
-Questions still needing **real data** are marked ⛁ and stay open until the
-coverage report (F9) runs against an actual ingest.
+Status 2026-07-13: first full research pass done (findings F1–F9 below);
+ADRs [0003](../decisions/0003-composite-scores-in-house.md) (composite
+scores), [0004](../decisions/0004-fundamental-history-depth.md) (history
+depth), [0005](../decisions/0005-feature-set-scope-v1.md) (v1 scope)
+**accepted**.
+
+Status 2026-07-14: the `make qa` reports ran against a real ingest
+(committed under [reports/](reports/)) — findings F10–F12 below close the
+data-gated (⛁) questions. Three more ADRs drafted in **proposed** status:
+[0006](../decisions/0006-staleness-policy.md) (staleness),
+[0007](../decisions/0007-market-inputs-daily-pit.md) (market inputs / V7),
+[0008](../decisions/0008-rank-representation.md) (rank representation).
+The canonical registry **`docs/features.md`** is drafted from the workspace
+tables — the research-phase exit criteria are met once 0006–0008 are
+accepted.
 
 ## Research questions
 
@@ -26,22 +34,20 @@ coverage report (F9) runs against an actual ingest.
 
 - [x] **SF1 field inventory.** → F1. Documentation-level inventory done; every
       candidate formula is computable from SF1 except the noted gaps.
-      ⛁ Null rates by year/sector still need real data (feeds V5).
-- [x] **History depth.** → F4, proposed ADR 0004. Depth tiers 0/4/8/12
+      Null rates by year/sector measured on real data → F10 (feeds V5).
+- [x] **History depth.** → F4, ADR 0004 (accepted). Depth tiers 0/4/8/12
       quarters + 12m/36m price windows; lag resolution by `reportperiod`
-      window, not positional LAG. ⛁ Universe survival per tier per year needs
-      real data.
-- [ ] **Staleness interaction.** ⛁ Analysis framed in F4.4 (late filers are
-      disproportionately distressed; a hard cutoff biases labels), but the 6-
-      vs-12-month decision needs the coverage report. Interim: compute
-      features against the freshest filing ≤ snapshot; store
-      `fundamentals_age_days` as a column and let the staleness cutoff be a
-      dataset-assembly filter, not a feature-time drop.
-- [x] **Rank representation details.** → F7. Key discovery: decision-0001
-      touch dates scatter snapshots across the quarter, so "within-date" rank
-      has a thin cross-section. Proposal: rank within
-      (calendar quarter, snapshot_kind). Sector-relative ranks: store for a
-      small allowlist only. Needs its own ADR at registry time.
+      window, not positional LAG. Universe survival per tier per year
+      measured → F10: tiers are viable (T1 ≥ 86% from 2000, T3 ≥ ~80% from
+      2003).
+- [x] **Staleness interaction.** → F11, proposed ADR 0006. The gradient is
+      real and steep (delist-within-1y rate 7.9% fresh → 29.4% at >365d
+      stale): staleness is signal, not noise. No feature-level cutoff; age
+      stored as a feature; cutoffs only as assembly-time filter flags.
+- [x] **Rank representation details.** → F7, proposed ADR 0008: rank within
+      (calendar quarter, snapshot_kind); sector-relative variant for a small
+      allowlist (F10's sector sizes support it — smallest real sector ≈ 60
+      snapshots/quarter, above the thin-slice guard).
 - [x] **Winsorization/clipping.** → F7.3. Store raw untouched; ranks are the
       outlier defense. No winsorized/z-scored duplicates in v1.
 - [x] **Negative-denominator semantics.** → F6. Prefer **yield orientation**
@@ -50,12 +56,13 @@ coverage report (F9) runs against an actual ingest.
       meaningful and kept. Where a fundamental denominator is unavoidable
       (ROE with negative equity, debt/EBITDA with EBITDA ≤ 0): NULL, plus the
       information preserved in dedicated flag features. One rule everywhere.
-- [ ] **Point-in-time market inputs.** ⛁ → F8. DAILY is the convenient
-      source for snapshot-date marketcap/EV, but whether its historical rows
-      are frozen-as-computed (PIT-safe) or recomputed after restatements is
-      **unverified** — added as verification task **V7** to TODO.md. Fallback
-      that is PIT-safe by construction: `SEP.close × ARQ share count` via our
-      own as-of join, EV from marketcap + ARQ debt − cash.
+- [x] **Point-in-time market inputs.** → F8.1, F12, proposed ADR 0007. V7
+      ran: DAILY was wholesale re-stamped (~2019), so "frozen as computed"
+      cannot be certified, but its values behave as-reported (85.9%
+      ARQ-sided on restated rows, flat across years) and our own
+      `SEP.close × ARQ shares` construction replicates DAILY.marketcap to
+      <0.1% median error. Decision: self-built construction is canonical;
+      DAILY is a cross-check only.
 
 ### Per family (PLAN.md §5 numbering)
 
@@ -587,6 +594,89 @@ tickers resolve by price-window containment with grace margins
 (pre-listing 540d for S-1-era filings, post-delisting 366d), nearest
 window on overlap.
 
+### F10 — Coverage results from real data (2026-07-14)
+
+`sharadar-qa coverage` over the full ingest ([reports/coverage.md](reports/coverage.md)):
+**515,731** median-kind snapshots 1997–2026, 97.0% with an ARQ filing.
+
+- **Data floor confirmed.** 1997 is junk (39% filing coverage — pre-floor
+  partial data; V3 should formally set the floor at 1998). Burn-in matches
+  ADR 0004's prediction: T1 32% in 1998 → 76% in 1999 → ≥86% from 2000;
+  T2 ≥88% from 2003; T3 ≥79% from 2002. **Earliest fully-tiered
+  walk-forward folds: ~2001–2003** depending on the deepest tier used.
+- **Steady state is healthy**: fresh-within-365d ≈ 96%, T1 ≈ 90%,
+  T3 ≈ 80–86% — the tier design costs little of the universe.
+- **The 2021–22 dip is real and informative**: T1 drops to 80%/89%, T3 to
+  ~68–70% — the IPO/SPAC vintage has no filing history. This is the
+  age-correlated missingness ADR 0004 predicted; rows stay, NULLs stay.
+- **Null rates are formula-driven, not data-quality-driven.** Overall ≤4%
+  for everything except the classified-balance-sheet trio
+  (`workingcapital`/`assetsc`/`liabilitiesc` ≈ 8%), which decomposes by
+  sector: **Real Estate ≈ 84% null** (REITs don't file classified balance
+  sheets) and residual Financial Services ≈ 55%. Consequence for the
+  registry: current-ratio/quick-ratio/NCAV/Altman-Z(WC term) are
+  structurally NULL for most REITs — expected, documented, and exactly what
+  the NULL policy is for. Also notable: `retearn` is 20% null in Energy and
+  14% in Utilities (partnership/MLP structures), degrading Z composites
+  there while the components remain individually usable. This closes the
+  REIT half of V5 (features usable except classified-BS ones); the
+  bank/insurer-separation half of V5 remains.
+- Sector cross-sections are large enough for sector ranks everywhere
+  (smallest real sector, residual Financial Services: ~6.9k snapshots ≈ 60
+  per quarter); the 717-row "(none)" sector gets NULL sector-ranks.
+
+### F11 — Staleness × labels results (2026-07-14)
+
+`sharadar-qa staleness` ([reports/staleness.md](reports/staleness.md)):
+86.3% of snapshots have a filing ≤93 days old; 8.8% at 94–183d; only 0.67%
+at 184–365d; 1.3% >365d; 3.0% no filing at all.
+
+The distress gradient is steep and monotone where it matters:
+delist-within-1y rate **7.9% (0–93d) → 8.9% (94–183d) → 24.8% (184–365d) →
+29.4% (>365d)**; median 1y forward CAGR +1.4% fresh vs. ≈ −10% for stale
+buckets; the >365d bucket's *mean* CAGR of +230% against a −7% median is
+the classic distressed lottery-ticket right tail. The no-filing bucket
+(median −11.2%) is a different population — mostly young listings before
+their first filing — not just late filers.
+
+**Conclusion (→ proposed ADR 0006):** staleness is one of the strongest
+distress signals in the dataset. Dropping stale rows would delete exactly
+the rows a deep-value model must learn to avoid (or exploit), and a
+183d-vs-365d cutoff debate is moot at 0.67%/1.3% row shares. Therefore: no
+feature-level staleness cutoff at all — features compute from the freshest
+filing however old; `fundamentals_age_days` becomes a first-class feature;
+`has_filing_183d`/`has_filing_365d` flags let downstream apply any cutoff
+as a filter. This also resolves TODO's "minimum-data filter" question in
+the same stroke: no row exclusion, flags instead.
+
+### F12 — V7 results: DAILY point-in-time safety (2026-07-14)
+
+`sharadar-qa daily-pit` ([reports/daily_pit.md](reports/daily_pit.md)):
+
+1. **Freshness:** `lastupdated − date` declines linearly from ~7,600 days
+   (1998) to ~0 (2020+) — the signature of a **wholesale re-stamp/rebuild
+   around 2019**. Historical DAILY rows are therefore *not* certifiably
+   frozen-as-computed; whatever they contain was (re)written years after
+   the fact.
+2. **Marketcap replication:** our `SEP.close × ARQ sharesbas × sharefactor`
+   construction matches DAILY.marketcap (unit scale $1M) with ≤0.02% median
+   error and ~98% of rows within 1%, every year. This simultaneously
+   validates our own construction and shows DAILY's share source is
+   as-reported.
+3. **The sharp test:** on 428k restated ticker-days, DAILY.pb sides with
+   the **as-reported** equity 85.9% of the time — and the rate is *flat*
+   across years (84–89%, including 2026 rows that cannot have been
+   restated-and-recomputed yet). If the 2019 rebuild had used restated
+   data, old years would skew toward MRQ and recent years toward ARQ; the
+   flatness says the residual ~14% is a systematic definition/timing
+   mismatch (equity variant, price timing), not progressive recomputation.
+
+**Verdict (→ proposed ADR 0007):** DAILY behaves point-in-time in its
+values but cannot be certified frozen, and our own construction replicates
+it essentially exactly — so the self-built SEP × ARQ path is the canonical
+market-input source (PIT-safe *by construction*, unit-testable), and DAILY
+is kept as a cross-check in QA only. No feature reads DAILY.
+
 ## Reading list / sources
 
 - [x] Piotroski (2000) — F-score components → F2.2.
@@ -613,16 +703,17 @@ Web sources consulted 2026-07-13:
 
 ## Exit criteria (research phase → M4 implementation)
 
-- [ ] Every cross-family question above has an ADR or an explicit deferral.
-      *(0003/0004/0005 proposed; rank-details ADR pending; staleness &
-      market-inputs ⛁ gated on F9/V7.)*
-- [ ] `docs/features.md` drafted: the canonical registry — one row per
+- [x] Every cross-family question above has an ADR or an explicit deferral.
+      *(0003/0004/0005 accepted; 0006/0007/0008 proposed from F10–F12;
+      market-regime stays explicitly deferred per PLAN §5.6.)*
+- [x] `docs/features.md` drafted: the canonical registry — one row per
       feature: name, family, formula, SF1/SEP inputs, history requirement,
-      null policy, raw+rank column names. *(Graduates from F2/F3/F5 tables
-      once ADRs 0003–0005 are accepted.)*
-- [ ] Per-family null-rate/coverage report runnable against real data (F9;
-      feeds V5 and the M4 exit criteria).
-- [ ] Implementation order for `src/features/` decided — proposed: coverage
-      report (F9) → base/market → valuation → profitability/growth →
-      solvency → quality → technical → classification; regime last behind
-      its ablation gate.
+      null policy, rank treatment. *(Drafted 2026-07-14; canonical once
+      0006–0008 flip to accepted.)*
+- [x] Per-family null-rate/coverage report runnable against real data (F9
+      implemented as `sharadar-qa`; real-data results in F10–F12 and
+      `reports/`).
+- [x] Implementation order for `src/features/` decided (registry §Build
+      order): base/market → valuation → profitability/growth → solvency →
+      quality → technical → classification → assembly-stage (ranks, G-score,
+      Conservative score); regime deferred behind its ablation gate.

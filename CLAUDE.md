@@ -12,6 +12,7 @@ classification. Parquet + DuckDB only; no services, no database.
 | `TODO.md` | Task register: milestones, verification tasks V1–V6, open questions. |
 | `docs/decisions/` | ADRs for resolved questions. Skim titles; read the ones your module touches. |
 | `docs/labels.md` | Canonical label/snapshot column definitions. Update it whenever the labels schema changes. |
+| `docs/features.md` | Canonical feature registry (one row per feature). Must stay 1:1 with `src/features/registry.py`; update both together. |
 | `docs/research/` | Research workspaces (feature-set research pre-M4 → `features.md` there). Findings go here, not in README/PLAN. |
 | `README.md` | Human-facing overview + how to run. Keep it high-level; don't let detail accumulate there. |
 
