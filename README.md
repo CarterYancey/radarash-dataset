@@ -335,6 +335,56 @@ sharadar-dataset/
   (`make dataset` or equivalent). No hand-edited intermediates.
 - Dataset versions are immutable and named; downstream repo pins a version.
 
+### Ingestion quick start
+
+Use Python 3.12 and [uv](https://docs.astral.sh/uv/), then provide the API key
+for a Nasdaq Data Link account with Sharadar access:
+
+```bash
+uv sync
+export NASDAQ_DATA_LINK_API_KEY=...
+uv run sharadar-ingest download
+```
+
+The command requests bulk exports for `TICKERS`, `SF1`, `SEP`, `SFP`,
+`ACTIONS`, `EVENTS`, and `DAILY`. Each export is streamed to temporary
+storage, converted with DuckDB to Zstandard-compressed Parquet, row-count
+validated, and atomically installed in `data/raw/`. A sibling
+`TABLE.meta.json` records source timestamps, row and column counts, sort keys,
+and the downloaded ZIP's SHA-256 digest.
+
+Raw tables are immutable by default: existing Parquet files are validated and
+kept. To deliberately take a new source snapshot, use `--force`. Individual
+tables and previously downloaded ZIP files are also supported:
+
+```bash
+uv run sharadar-ingest download TICKERS SF1
+uv run sharadar-ingest convert TICKERS path/to/SHARADAR_TICKERS.zip
+```
+
+Parquet files can be queried without loading them into a service:
+
+```sql
+SELECT ticker, permaticker
+FROM read_parquet('data/raw/TICKERS.parquet')
+WHERE "table" = 'SEP';
+```
+
+Run the ingestion test suite with `make test`. Licensed raw data and all
+reproducible outputs are excluded from Git; only directory placeholders are
+tracked.
+
+Build the M1 mapping, universe, annual counts, and chart after ingestion:
+
+```bash
+make identity
+```
+
+This writes Parquet artifacts to `data/interim/` and the exit chart to
+`data/interim/reports/universe_counts_by_year.png`. Identifier ambiguity is
+never inferred from `relatedtickers`; see
+`docs/decisions/0001-ticker-reuse.md`.
+
 ## 9. Verification tasks (do these before trusting anything)
 
 These are the empirical checks behind the design assumptions. Each produces a

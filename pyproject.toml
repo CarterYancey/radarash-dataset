@@ -1,3 +1,7 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
 name = "radarash-dataset"
 version = "0.1.0"
@@ -5,5 +9,21 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "duckdb>=1.4",
+    "matplotlib>=3.10",
     "nasdaq-data-link>=1.0.4",
+    "requests>=2.32",
 ]
+
+[project.scripts]
+sharadar-ingest = "ingest.cli:main"
+sharadar-identity = "identity.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=9"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ingest", "src/identity"]
