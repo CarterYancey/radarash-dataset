@@ -78,7 +78,7 @@ sharadar-dataset/
 | M1 — Ingestion & identity | ✅ code done (verification writeups pending) |
 | M2 — Point-in-time verified | not started |
 | M3 — Labels | ✅ code done (verification writeups pending) |
-| M4 — Features | next up — research phase, see `docs/research/features.md` |
+| M4 — Features | next up — research done (ADRs 0003–0008 accepted); implementing per `docs/features.md` |
 | M5 — Splits & assembly | not started |
 
 The task register, verification tasks, and open questions live in

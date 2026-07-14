@@ -1,12 +1,13 @@
 # Canonical feature registry (M4)
 
-**Status: draft** — implements accepted ADRs
+**Status: canonical** (2026-07-14) — implements accepted ADRs
 [0003](decisions/0003-composite-scores-in-house.md) (composites in-house),
 [0004](decisions/0004-fundamental-history-depth.md) (history depth),
-[0005](decisions/0005-feature-set-scope-v1.md) (v1 scope); becomes canonical
-when proposed ADRs [0006](decisions/0006-staleness-policy.md) (staleness),
+[0005](decisions/0005-feature-set-scope-v1.md) (v1 scope),
+[0006](decisions/0006-staleness-policy.md) (staleness),
 [0007](decisions/0007-market-inputs-daily-pit.md) (market inputs),
-[0008](decisions/0008-rank-representation.md) (ranks) are accepted.
+[0008](decisions/0008-rank-representation.md) (ranks).
+`src/features/` implements this registry in the build order below.
 Research trail: [research/features.md](research/features.md).
 
 This file and `src/features/registry.py` must stay 1:1 — assembly validates

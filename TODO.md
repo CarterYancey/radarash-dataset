@@ -14,26 +14,29 @@ resolved questions get an ADR in `docs/decisions/` and are checked off here.
       *(Code done: `src/labels/`, `docs/labels.md`, decisions 0001/0002.
       Remaining: V4, V6 below.)*
 - [ ] **M4 — Features.** Feature families implemented with per-family tests and
-      null-rate reports; V5 done. **Next major task — research first**, see below.
+      null-rate reports; V5 done. **Next major task — implementation**, see below.
+      *(Research phase complete: ADRs 0003–0008 accepted, registry canonical.)*
 - [ ] **M5 — Splits & assembly.** Purged/embargoed split tagging; `dataset_v1.0`
       produced end-to-end by one command; QA report published.
 
-## Next major task: feature-set research (pre-M4)
+## Next major task: M4 feature implementation
 
-Extensive research and planning before any feature code is written. The
-workspace and findings live in **`docs/research/features.md`** — not here, not
-in README/CLAUDE.md. Flow: research findings → ADRs in `docs/decisions/` →
-canonical registry `docs/features.md` → implementation in `src/features/`.
+The pre-M4 research phase is **complete** (2026-07-14): findings F1–F9
+closed the theory questions (ADRs **0003/0004/0005** accepted); `make qa`
+ran against a real ingest (reports committed in `docs/research/reports/`,
+distilled into findings **F10–F12**), closing the data-gated questions
+(ADRs **0006** staleness, **0007** market inputs / V7, **0008** rank
+representation — reviewed and **accepted**). Every research-phase exit
+criterion (`docs/research/features.md` §Exit criteria) is met and the
+registry **`docs/features.md`** is now **canonical**.
 
-*Status:* research phase complete pending final ADR review. Findings F1–F9
-(2026-07-13) closed the theory questions; ADRs **0003/0004/0005** accepted.
-`make qa` ran against a real ingest (reports committed in
-`docs/research/reports/`, distilled into findings **F10–F12**), closing the
-data-gated questions; ADRs **0006** (staleness), **0007** (market inputs /
-V7), **0008** (rank representation) drafted in *proposed* status, and the
-canonical registry **`docs/features.md`** is drafted. Review 0006–0008 →
-flip to accepted → registry becomes canonical → implement `src/features/`
-in the registry's build order.
+Implement `src/features/` in the registry's build order: `base` (as-of +
+lag resolution) and `market` (marketcap/EV) → `valuation` →
+`profitability` + `growth` → `solvency` → `quality` → `technical` →
+`classification`. Each family gets per-family tests and writes
+`data/interim/features/{family}.parquet` on the shared key; ranks and the
+two assembly-stage columns (`mohanram_g7`, `conservative_score`) land at
+assembly (M5). Keep the registry and `src/features/registry.py` 1:1.
 
 ## Verification tasks (do these before trusting anything)
 
@@ -69,7 +72,7 @@ Each produces a short writeup in `docs/decisions/`.
       but values behave as-reported (85.9% ARQ-sided on restated rows, flat
       across years) and our `SEP.close × ARQ shares` construction replicates
       it to <0.1% median error. Writeup + decision (self-built canonical,
-      DAILY cross-check only): `docs/decisions/0007` *(proposed)*; results
+      DAILY cross-check only): `docs/decisions/0007` *(accepted)*; results
       in research §F12.
 
 ## Open questions (decide → ADR in docs/decisions/ → check off)
@@ -80,7 +83,7 @@ Each produces a short writeup in `docs/decisions/`.
       low/median/high touch-date snapshots → `docs/decisions/0001`.
 - [x] Staleness cutoff for fundamentals at snapshot time: **no cutoff** —
       age is a feature, cutoffs are flag columns → `docs/decisions/0006`
-      *(proposed; data in research §F11)*.
+      *(accepted; data in research §F11)*.
 - [ ] Minimum liquidity/market-cap floor? (Microcaps dominate a total-market
       universe and may not be investable; consider a `min_marketcap` flag column
       rather than exclusion, so downstream can choose. The registry's
@@ -88,11 +91,11 @@ Each produces a short writeup in `docs/decisions/`.
       the flag-column decision itself is still open.)
 - [x] Minimum-data filters for snapshots (PLAN.md §3): **no filing
       requirement** — `has_filing_183d`/`has_filing_365d` flags instead
-      → folded into `docs/decisions/0006` *(proposed)*.
+      → folded into `docs/decisions/0006` *(accepted)*.
 - [x] Rank features within-date only, or within-date-and-sector?
       **Within (calendar quarter, snapshot_kind)**, `percent_rank`,
       thin-slice guard 20; sector variant for an allowlist
-      → `docs/decisions/0008` *(proposed; research §F7 + §F10)*.
+      → `docs/decisions/0008` *(accepted; research §F7 + §F10)*.
 - [ ] Snapshot frequency: quarterly vs. monthly (monthly triples data volume and
       overlap; quarterly is the default until shown insufficient).
 - [ ] Min/max terminal-price labels: keep, or drop after sensitivity analysis?

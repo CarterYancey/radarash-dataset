@@ -37,7 +37,7 @@ present.
 src/ingest/      table registry (tables.py), download, CSV→parquet conversion
 src/identity/    tickers dedup (source.py), mapping, universe, year counts
 src/labels/      source views, snapshots, delistings, paths (stage 1), compute (stage 2), cli
-src/features/    (M4, not started — research first, see TODO.md)
+src/features/    (M4, not started — registry docs/features.md is canonical; implement in its build order)
 src/splits/      (M5, not started — PLAN.md §7 is required reading)
 src/qa/          data-gated QA reports (sharadar-qa): coverage/null rates (F9), staleness×labels, DAILY PIT check (V7)
 tests/           synthetic-fixture tests; conftest.py has shared TICKERS fixtures

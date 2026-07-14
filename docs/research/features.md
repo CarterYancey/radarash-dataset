@@ -28,6 +28,12 @@ The canonical registry **`docs/features.md`** is drafted from the workspace
 tables — the research-phase exit criteria are met once 0006–0008 are
 accepted.
 
+Status 2026-07-14 (close-out): ADRs 0006–0008 reviewed and **accepted**;
+`docs/features.md` is **canonical**. All exit criteria below are met — the
+research phase is closed and M4 implementation of `src/features/` proceeds
+in the registry's build order. This workspace is now a historical record;
+new findings during implementation go to new ADRs, not here.
+
 ## Research questions
 
 ### Cross-family (answer once, apply everywhere)
@@ -40,11 +46,11 @@ accepted.
       window, not positional LAG. Universe survival per tier per year
       measured → F10: tiers are viable (T1 ≥ 86% from 2000, T3 ≥ ~80% from
       2003).
-- [x] **Staleness interaction.** → F11, proposed ADR 0006. The gradient is
+- [x] **Staleness interaction.** → F11, ADR 0006 (accepted). The gradient is
       real and steep (delist-within-1y rate 7.9% fresh → 29.4% at >365d
       stale): staleness is signal, not noise. No feature-level cutoff; age
       stored as a feature; cutoffs only as assembly-time filter flags.
-- [x] **Rank representation details.** → F7, proposed ADR 0008: rank within
+- [x] **Rank representation details.** → F7, ADR 0008 (accepted): rank within
       (calendar quarter, snapshot_kind); sector-relative variant for a small
       allowlist (F10's sector sizes support it — smallest real sector ≈ 60
       snapshots/quarter, above the thin-slice guard).
@@ -56,7 +62,7 @@ accepted.
       meaningful and kept. Where a fundamental denominator is unavoidable
       (ROE with negative equity, debt/EBITDA with EBITDA ≤ 0): NULL, plus the
       information preserved in dedicated flag features. One rule everywhere.
-- [x] **Point-in-time market inputs.** → F8.1, F12, proposed ADR 0007. V7
+- [x] **Point-in-time market inputs.** → F8.1, F12, ADR 0007 (accepted). V7
       ran: DAILY was wholesale re-stamped (~2019), so "frozen as computed"
       cannot be certified, but its values behave as-reported (85.9%
       ARQ-sided on restated rows, flat across years) and our own
@@ -704,12 +710,13 @@ Web sources consulted 2026-07-13:
 ## Exit criteria (research phase → M4 implementation)
 
 - [x] Every cross-family question above has an ADR or an explicit deferral.
-      *(0003/0004/0005 accepted; 0006/0007/0008 proposed from F10–F12;
-      market-regime stays explicitly deferred per PLAN §5.6.)*
+      *(0003/0004/0005 accepted 2026-07-13; 0006/0007/0008 from F10–F12
+      accepted 2026-07-14; market-regime stays explicitly deferred per
+      PLAN §5.6.)*
 - [x] `docs/features.md` drafted: the canonical registry — one row per
       feature: name, family, formula, SF1/SEP inputs, history requirement,
-      null policy, rank treatment. *(Drafted 2026-07-14; canonical once
-      0006–0008 flip to accepted.)*
+      null policy, rank treatment. *(Canonical as of 2026-07-14 with
+      0006–0008 accepted.)*
 - [x] Per-family null-rate/coverage report runnable against real data (F9
       implemented as `sharadar-qa`; real-data results in F10–F12 and
       `reports/`).
