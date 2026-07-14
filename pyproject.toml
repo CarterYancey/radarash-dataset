@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "radarash-dataset"
 version = "0.1.0"
-description = "Add your description here"
+description = "Point-in-time Sharadar dataset construction for equity models"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -18,6 +18,7 @@ dependencies = [
 [project.scripts]
 sharadar-ingest = "ingest.cli:main"
 sharadar-identity = "identity.cli:main"
+sharadar-labels = "labels.cli:main"
 
 [dependency-groups]
 dev = ["pytest>=9"]
@@ -26,4 +27,4 @@ dev = ["pytest>=9"]
 testpaths = ["tests"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/ingest", "src/identity"]
+packages = ["src/ingest", "src/identity", "src/labels"]
