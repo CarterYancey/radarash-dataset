@@ -34,11 +34,27 @@ metadata + flags, never a filter (ADR 0006). Run with `make features`;
 re-run `make qa` after the first real-data build (per-year/per-tier
 null-rate check, ADR 0004 burn-in).
 
-Still open in M4: **V5** (bank/insurer separation half) and a real-data
-`make features` + coverage pass. Then M5: purged/embargoed split tagging
-(PLAN §7 is required reading), assembly (families × labels × splits join,
+Real-data `make features` + coverage pass done (2026-07-15): reports
+committed under `docs/research/reports/` — 515,731 median snapshots,
+97% with an ARQ filing, fresh-within-365d 95.7%, worst field-level null
+rate 8% (`workingcapital`, the classified-balance-sheet REIT story from
+§F10); staleness×labels gradient monotone, consistent with ADR 0006.
+Nothing in the pass contradicts the registry or the staleness policy.
+
+Still open in M4: **V5** (bank/insurer separation half).
+
+M5 split tagging shipped (2026-07-15): `src/splits/` tags per-horizon
+purged + embargoed roles for the sealed `holdout` and expanding
+`walkforward` schemes (calendar-year folds, median-only test rows, tags
+never filters) → `splits.parquet` + frozen fold manifest
+`split_folds.parquet`. Design: `docs/decisions/0010`; canonical
+definitions: `docs/splits.md`. Run `make splits` after the first
+real-data build and sanity-check the logged fold calendar.
+
+Remaining in M5: assembly (families × labels × splits join,
 registry-driven ranks/sector-ranks per ADR 0008, `mohanram_g7` and
-`conservative_score`, uniqueness weights), and `dataset_v1.0` end-to-end.
+`conservative_score`, uniqueness weights — the `sample_weight` open
+question below), and `dataset_v1.0` end-to-end by one command.
 
 ## Verification tasks (do these before trusting anything)
 

@@ -66,6 +66,7 @@ sharadar-dataset/
 ├── docs/
 │   ├── features.md   # canonical feature registry
 │   ├── labels.md     # canonical label definitions & conventions
+│   ├── splits.md     # canonical split-tag definitions
 │   ├── decisions/    # ADR-style records of resolved design questions
 │   └── research/     # research workspaces (feature-set research, etc.)
 └── tests/
@@ -79,7 +80,7 @@ sharadar-dataset/
 | M2 — Point-in-time verified | not started |
 | M3 — Labels | ✅ code done (verification writeups pending) |
 | M4 — Features | ✅ code done (ranks + assembly-stage composites land at M5; V5 pending) |
-| M5 — Splits & assembly | not started |
+| M5 — Splits & assembly | 🚧 split tagging done; assembly + `dataset_v1.0` pending |
 
 The task register, verification tasks, and open questions live in
 **[TODO.md](TODO.md)**.
@@ -147,7 +148,19 @@ canonical registry (`docs/features.md` / `src/features/registry.py`).
 Ranks, sector ranks, and the assembly-stage composites are computed at
 assembly (M5).
 
-### 5. Run the QA reports (feature-research inputs)
+### 5. Tag the train/validation/test splits
+
+```bash
+make splits          # or: uv run sharadar-splits --help
+```
+
+Produces under `data/interim/`: `splits.parquet` (per-horizon purged +
+embargoed role tags — train/test/purged/embargoed — for the sealed holdout
+and expanding walk-forward folds) and `split_folds.parquet` (the frozen
+fold manifest). Tags, never filters: no row is dropped. Definitions:
+`docs/splits.md`.
+
+### 6. Run the QA reports (feature-research inputs)
 
 ```bash
 make qa              # or: uv run sharadar-qa {coverage,staleness,daily-pit} --help
@@ -175,5 +188,6 @@ duckdb.sql("SELECT count(*) FROM 'data/interim/labels.parquet'")
 | [TODO.md](TODO.md) | Task register: milestones, verification tasks, open questions |
 | [CLAUDE.md](CLAUDE.md) | Orientation for AI agents & developers: conventions, invariants, what to read |
 | [docs/labels.md](docs/labels.md) | Canonical label/snapshot column definitions |
+| [docs/splits.md](docs/splits.md) | Canonical split-tag definitions (roles, fold calendar) |
 | [docs/decisions/](docs/decisions/) | ADRs for resolved design questions |
 | [docs/research/](docs/research/) | Research workspaces (feature-set research pre-M4) |
