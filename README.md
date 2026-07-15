@@ -78,7 +78,7 @@ sharadar-dataset/
 | M1 — Ingestion & identity | ✅ code done (verification writeups pending) |
 | M2 — Point-in-time verified | not started |
 | M3 — Labels | ✅ code done (verification writeups pending) |
-| M4 — Features | next up — research phase, see `docs/research/features.md` |
+| M4 — Features | ✅ code done (ranks + assembly-stage composites land at M5; V5 pending) |
 | M5 — Splits & assembly | not started |
 
 The task register, verification tasks, and open questions live in
@@ -134,7 +134,20 @@ stock-quarter, on the intra-quarter low/median/high touch dates) and
 `labels.parquet` (the full forward-return label matrix per horizon, with
 delisting-aware handling). Column definitions: `docs/labels.md`.
 
-### 4. Run the QA reports (feature-research inputs)
+### 4. Build the feature families
+
+```bash
+make features        # or: uv run sharadar-features --help
+```
+
+Produces one parquet per feature family under `data/interim/features/`
+(meta, valuation, profitability, growth, solvency, quality, technical,
+classification), each keyed like `labels.parquet` and validated against the
+canonical registry (`docs/features.md` / `src/features/registry.py`).
+Ranks, sector ranks, and the assembly-stage composites are computed at
+assembly (M5).
+
+### 5. Run the QA reports (feature-research inputs)
 
 ```bash
 make qa              # or: uv run sharadar-qa {coverage,staleness,daily-pit} --help

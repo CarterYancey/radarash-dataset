@@ -1,12 +1,13 @@
 # Canonical feature registry (M4)
 
-**Status: draft** — implements accepted ADRs
+**Status: canonical** (2026-07-14) — implements accepted ADRs
 [0003](decisions/0003-composite-scores-in-house.md) (composites in-house),
 [0004](decisions/0004-fundamental-history-depth.md) (history depth),
-[0005](decisions/0005-feature-set-scope-v1.md) (v1 scope); becomes canonical
-when proposed ADRs [0006](decisions/0006-staleness-policy.md) (staleness),
+[0005](decisions/0005-feature-set-scope-v1.md) (v1 scope),
+[0006](decisions/0006-staleness-policy.md) (staleness),
 [0007](decisions/0007-market-inputs-daily-pit.md) (market inputs),
-[0008](decisions/0008-rank-representation.md) (ranks) are accepted.
+[0008](decisions/0008-rank-representation.md) (ranks).
+`src/features/` implements this registry in the build order below.
 Research trail: [research/features.md](research/features.md).
 
 This file and `src/features/registry.py` must stay 1:1 — assembly validates
@@ -17,8 +18,12 @@ versions diffable from the registry alone.
 ## Conventions (apply to every feature unless its row says otherwise)
 
 - **Key:** `(permaticker, snapshot_date, snapshot_kind)` — same as
-  `labels.parquet`. One row per snapshot; the three same-quarter kinds share
-  fundamentals but not price-based features.
+  `labels.parquet`. One row per snapshot. Fundamentals resolve strictly per
+  `snapshot_date` (decision 0001: no special casing per kind): the three
+  same-quarter kinds *usually* share a quarter's fundamentals, but a filing
+  whose `datekey` lands between two kinds' snapshot dates puts those kinds on
+  different filings — point-in-time-correct by design. Price-based features
+  always differ across kinds.
 - **Point-in-time:** fundamentals come from the freshest as-reported row
   with `datekey < snapshot_date` (usable strictly after the filing date,
   PLAN §2). Flow ("ttm") inputs are **ART**; point-in-time levels ("q") are
@@ -152,7 +157,7 @@ composite is deferred (ADR 0003) — its components are all above.
 | `depi` | T1 | `(depamor/(depamor + ppnenet_q))₋₁ / (…)current` | |
 | `sgai` | T1 | `(sgna/revenue) / (sgna₋₁/revenue₋₁)` | |
 | `lvgi` | T1 ⌂ | `((debt_q + liabilitiesc_q)/assets_q)` YoY ratio | |
-| `accruals_to_assets` | T0 | `(netinc − ncfo) / assets_q` | TATA & Sloan accruals (CF method), one column |
+| `accruals_to_assets` | T0 | `(netinc − ncfo) / assets_q` | S; TATA & Sloan accruals (CF method), one column |
 | `beneish_m` | T1 ⌂ | `−4.84 + 0.92·dsri + 0.528·gmi + 0.404·aqi + 0.892·sgi + 0.115·depi − 0.172·sgai + 4.679·tata − 0.327·lvgi` | composite |
 | `piotroski_f` | T1 | count of the 9 signals (research §F2.2 table) | composite, 0–9; signals from components above + `ncfcommon ≤ 0` |
 | `noa_to_assets` | T1 | `((assets_q − cashneq_q − investments_q) − (liabilities_q − debt_q)) / assets_q₋₁` | Hirshleifer NOA |
@@ -182,6 +187,16 @@ composite is deferred (ADR 0003) — its components are all above.
 | `famaindustry` | TICKERS | FF-48-style; G-score peer grouping |
 | `scalemarketcap` | TICKERS | size bucket, current-state |
 | `siccode` | TICKERS | fallback for era-stable industry mapping |
+
+Current-state means three accepted (v1) edges: a reclassified firm's whole
+history gets today's label; delisted firms' labels **freeze at delisting**
+while survivors' keep refreshing (a faint survivorship echo confined to
+these columns); and at assembly the `_secrank` cross-sections group
+historical rows by current-state sector — mild lookahead through
+peer-group *identity* only, never through the ranked firm's own values.
+`siccode` (assigned at registration, era-stable) is the stored fallback.
+Revisit if material drift ever shows up — measurable as a cross-export
+diff once two ingest vintages exist.
 
 ## Build order (`src/features/`, research §F8.2)
 

@@ -55,3 +55,15 @@ should additionally be computed within sector. Coverage data (features.md
   the ranked stock's future; the model consumes ranks only as relative
   position, matching how the strategy would rank a live cross-section at
   deployment.
+
+## Clarification (2026-07-15)
+
+"Fundamentals are quarter-shared so this is exact for them" (Decision §1)
+describes the common case, not a mechanic. Resolution is strictly per
+`snapshot_date` (decision 0001: no special casing per kind), so a filing
+whose `datekey` lands between two same-quarter kinds' snapshot dates puts
+those kinds on different filings — and a (quarter, kind) rank cross-section
+can therefore mix filing vintages across firms. This is the same
+cross-sectional-context situation as the accepted caveat above: PIT-safe
+for the ranked firm, matching a live deployment cross-section. Pinned by
+the straddle test in tests/test_features_cli.py.
