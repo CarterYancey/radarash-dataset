@@ -153,7 +153,7 @@ composite is deferred (ADR 0003) — its components are all above.
 | `depi` | T1 | `(depamor/(depamor + ppnenet_q))₋₁ / (…)current` | |
 | `sgai` | T1 | `(sgna/revenue) / (sgna₋₁/revenue₋₁)` | |
 | `lvgi` | T1 ⌂ | `((debt_q + liabilitiesc_q)/assets_q)` YoY ratio | |
-| `accruals_to_assets` | T0 | `(netinc − ncfo) / assets_q` | TATA & Sloan accruals (CF method), one column |
+| `accruals_to_assets` | T0 | `(netinc − ncfo) / assets_q` | S; TATA & Sloan accruals (CF method), one column |
 | `beneish_m` | T1 ⌂ | `−4.84 + 0.92·dsri + 0.528·gmi + 0.404·aqi + 0.892·sgi + 0.115·depi − 0.172·sgai + 4.679·tata − 0.327·lvgi` | composite |
 | `piotroski_f` | T1 | count of the 9 signals (research §F2.2 table) | composite, 0–9; signals from components above + `ncfcommon ≤ 0` |
 | `noa_to_assets` | T1 | `((assets_q − cashneq_q − investments_q) − (liabilities_q − debt_q)) / assets_q₋₁` | Hirshleifer NOA |

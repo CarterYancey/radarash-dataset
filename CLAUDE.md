@@ -24,6 +24,7 @@ make test               # pytest; single test: uv run pytest tests/test_x.py -k 
 make ingest             # bulk download (needs NASDAQ_DATA_LINK_API_KEY; ~40-50 GB)
 make identity           # ticker↔permaticker mapping + universe
 make labels             # snapshots + label matrix
+make features           # per-family feature tables (needs labels)
 make qa                 # data-gated QA reports (coverage, staleness, DAILY PIT)
 ```
 
@@ -37,7 +38,7 @@ present.
 src/ingest/      table registry (tables.py), download, CSV→parquet conversion
 src/identity/    tickers dedup (source.py), mapping, universe, year counts
 src/labels/      source views, snapshots, delistings, paths (stage 1), compute (stage 2), cli
-src/features/    (M4, not started — registry docs/features.md is canonical; implement in its build order)
+src/features/    registry.py (1:1 with docs/features.md), base (as-of + lags), market, 8 family modules, output (registry-validated writer), cli
 src/splits/      (M5, not started — PLAN.md §7 is required reading)
 src/qa/          data-gated QA reports (sharadar-qa): coverage/null rates (F9), staleness×labels, DAILY PIT check (V7)
 tests/           synthetic-fixture tests; conftest.py has shared TICKERS fixtures

@@ -1,7 +1,7 @@
 # Optional subset, e.g.: make ingest TABLES="TICKERS SEP"
 TABLES ?=
 
-.PHONY: ingest identity labels qa test
+.PHONY: ingest identity labels features qa test
 
 ingest:
 	uv run sharadar-ingest $(if $(TABLES),--tables $(TABLES))
@@ -11,6 +11,9 @@ identity:
 
 labels:
 	uv run sharadar-labels
+
+features:
+	uv run sharadar-features
 
 qa:
 	uv run sharadar-qa coverage

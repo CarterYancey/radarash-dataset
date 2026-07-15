@@ -14,29 +14,31 @@ resolved questions get an ADR in `docs/decisions/` and are checked off here.
       *(Code done: `src/labels/`, `docs/labels.md`, decisions 0001/0002.
       Remaining: V4, V6 below.)*
 - [ ] **M4 — Features.** Feature families implemented with per-family tests and
-      null-rate reports; V5 done. **Next major task — implementation**, see below.
-      *(Research phase complete: ADRs 0003–0008 accepted, registry canonical.)*
+      null-rate reports; V5 done.
+      *(Code done: `src/features/` implements the canonical registry in its
+      build order, registry-validated columns, hand-checked fixture tests;
+      null-rate reports = `sharadar-qa coverage`. Ranks and the two
+      assembly-stage composites land at M5 assembly. Remaining: V5 below.)*
 - [ ] **M5 — Splits & assembly.** Purged/embargoed split tagging; `dataset_v1.0`
       produced end-to-end by one command; QA report published.
 
-## Next major task: M4 feature implementation
+## Next major task: M5 splits & assembly
 
-The pre-M4 research phase is **complete** (2026-07-14): findings F1–F9
-closed the theory questions (ADRs **0003/0004/0005** accepted); `make qa`
-ran against a real ingest (reports committed in `docs/research/reports/`,
-distilled into findings **F10–F12**), closing the data-gated questions
-(ADRs **0006** staleness, **0007** market inputs / V7, **0008** rank
-representation — reviewed and **accepted**). Every research-phase exit
-criterion (`docs/research/features.md` §Exit criteria) is met and the
-registry **`docs/features.md`** is now **canonical**.
+M4 implementation shipped (2026-07-15): `src/features/` implements the
+canonical registry (`docs/features.md` ↔ `registry.py`, 1:1 enforced by
+tests and by the writer) in the build order — foundations `base` (T0 as-of
+join + reportperiod lag matching, ADR 0004) and `market` (self-built
+marketcap/EV, ADR 0007), then the eight families, each writing
+`data/interim/features/{family}.parquet` on the labels key. Staleness is
+metadata + flags, never a filter (ADR 0006). Run with `make features`;
+re-run `make qa` after the first real-data build (per-year/per-tier
+null-rate check, ADR 0004 burn-in).
 
-Implement `src/features/` in the registry's build order: `base` (as-of +
-lag resolution) and `market` (marketcap/EV) → `valuation` →
-`profitability` + `growth` → `solvency` → `quality` → `technical` →
-`classification`. Each family gets per-family tests and writes
-`data/interim/features/{family}.parquet` on the shared key; ranks and the
-two assembly-stage columns (`mohanram_g7`, `conservative_score`) land at
-assembly (M5). Keep the registry and `src/features/registry.py` 1:1.
+Still open in M4: **V5** (bank/insurer separation half) and a real-data
+`make features` + coverage pass. Then M5: purged/embargoed split tagging
+(PLAN §7 is required reading), assembly (families × labels × splits join,
+registry-driven ranks/sector-ranks per ADR 0008, `mohanram_g7` and
+`conservative_score`, uniqueness weights), and `dataset_v1.0` end-to-end.
 
 ## Verification tasks (do these before trusting anything)
 
