@@ -1,6 +1,6 @@
 # Coverage report (features.md §F9)
 
-Generated 2026-07-13 by `sharadar-qa coverage` over median-kind snapshots. Machine-readable detail (parquet/CSV, incl. full null-rate tables) under `data/interim/qa/`; the CSVs beside this file are the committable copies.
+Generated 2026-07-15 by `sharadar-qa coverage` over median-kind snapshots. Machine-readable detail (parquet/CSV, incl. full null-rate tables) under `data/interim/qa/`; the CSVs beside this file are the committable copies.
 
 **Headline:** 515,731 snapshots; 500,473 with an ARQ filing; fresh-within-365d 95.7%; T1 87.0%; T3 70.0%.
 
