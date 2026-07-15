@@ -16,6 +16,11 @@ Synthetic weekday calendar 2015-01-01 .. 2017-12-31, four stocks:
   Checks the technical window math on a moving price and that fundamentals
   stay NULL without breaking price-based features.
 - BANK (400004): SIC 6021, excluded from the universe -> no feature rows.
+- STRAD (400005): trades five days in 2016-Q1 only, with its FY2015 filing
+  landing mid-quarter (datekey 2016-02-15) *between* the median/low snapshot
+  dates (Jan 4 / Jan 15) and the high date (Mar 15). Pins the straddle rule:
+  fundamentals resolve strictly per snapshot_date, so same-quarter kinds on
+  opposite sides of a filing use different filings.
 """
 
 from __future__ import annotations
@@ -44,7 +49,16 @@ SEP,400001,ACME,Acme Industries,NYSE,Domestic Common Stock,Industrials,Machinery
 SEP,400002,NEG,Negative Corp,OTC,Domestic Common Stock,Healthcare,Biotechnology,Pharmaceuticals,2836,2 - Micro,Y,2015-01-01,2016-12-31,2026-07-01
 SEP,400003,GROW,Growth Corp,NYSE,Domestic Common Stock,Technology,Software - Application,Business Services,7372,4 - Mid,N,2015-01-01,2017-12-31,2026-07-01
 SEP,400004,BANK,Big Bank,NYSE,Domestic Common Stock,Financial Services,Banks,Banking,6021,5 - Large,N,2015-01-01,2017-12-31,2026-07-01
+SEP,400005,STRAD,Straddle Corp,OTC,Domestic Common Stock,Industrials,Machinery,Machinery,3550,2 - Micro,Y,2016-01-04,2016-03-31,2026-07-01
 """
+
+STRAD_PRICES = {
+    date(2016, 1, 4): 20.0,   # median (tie -> earliest)
+    date(2016, 1, 15): 10.0,  # low, before the 2016-02-15 filing
+    date(2016, 2, 1): 20.0,
+    date(2016, 3, 15): 30.0,  # high, after the 2016-02-15 filing
+    date(2016, 3, 31): 20.0,
+}
 
 ACTIONS_CSV = """\
 date,action,ticker,name,contraticker,contraname
@@ -119,6 +133,11 @@ def build_sf1_csv() -> str:
                       ACME_FY2015_LEVELS, {**ACME_FY2015_FLOWS, "revenue": 630})
     lines += sf1_rows("NEG", "2016-03-01", "2015-12-31",
                       NEG_FY2015_LEVELS, NEG_FY2015_FLOWS)
+    strad_levels = {"assets": 400, "sharesbas": 10, "sharefactor": 1}
+    lines += sf1_rows("STRAD", "2015-05-01", "2014-12-31",
+                      strad_levels, {"revenue": 100})
+    lines += sf1_rows("STRAD", "2016-02-15", "2015-12-31",
+                      strad_levels, {"revenue": 200})
     return "\n".join(lines) + "\n"
 
 
@@ -144,6 +163,9 @@ def build_sep_csv() -> str:
         lines.append(f"BANK,{day},25.0,25.0,3000,2026-07-01")
         if day <= date(2016, 12, 31):
             lines.append(f"NEG,{day},1.0,1.0,500,2026-07-01")
+        if day in STRAD_PRICES:
+            px = STRAD_PRICES[day]
+            lines.append(f"STRAD,{day},{px!r},{px!r},100,2026-07-01")
     return "\n".join(lines) + "\n"
 
 
@@ -200,14 +222,15 @@ def acme(data_dir: Path, family: str, columns: str, snapshot_date: str):
 
 
 def test_outputs_exist_with_shared_key_and_counts(features_world):
-    # ACME 12 quarters, NEG 8, GROW 12 -> 32 quarters x 3 kinds; BANK none.
+    # ACME 12 quarters, NEG 8, GROW 12, STRAD 1 -> 33 quarters x 3 kinds;
+    # BANK none.
     for family in FAMILIES:
         rows = query(
             features_world,
             family,
             "SELECT count(*), count(DISTINCT permaticker) FROM {t}",
         )
-        assert rows == [(96, 3)], family
+        assert rows == [(99, 4)], family
 
 
 def test_meta_staleness_and_provenance(features_world):
@@ -476,6 +499,41 @@ def test_technical_growth_stock(features_world):
     assert logmc is None  # GROW has no filings -> no share count
     assert 250_000 < dv < 290_000  # price ~135 x volume 2000
     assert 0 < amihud < 1e-6
+
+
+def test_same_quarter_kinds_straddling_a_filing(features_world):
+    # STRAD's FY2015 filing (datekey 2016-02-15) lands between the
+    # median/low snapshot dates and the high date of the same quarter:
+    # fundamentals must resolve per snapshot_date, not per quarter.
+    rows = query(
+        features_world,
+        "meta",
+        """
+        SELECT snapshot_kind, snapshot_date, fund_datekey, fund_reportperiod
+        FROM {t} WHERE permaticker = 400005 ORDER BY snapshot_date
+        """,
+    )
+    assert rows == [
+        ("median", date(2016, 1, 4), date(2015, 5, 1), date(2014, 12, 31)),
+        ("low", date(2016, 1, 15), date(2015, 5, 1), date(2014, 12, 31)),
+        ("high", date(2016, 3, 15), date(2016, 2, 15), date(2015, 12, 31)),
+    ]
+
+    # The straddle shows up in values too: revenue 100 before the filing,
+    # 200 after; marketcap = entry close x 10 shares.
+    rows = query(
+        features_world,
+        "valuation",
+        """
+        SELECT snapshot_kind, sales_yield FROM {t}
+        WHERE permaticker = 400005 ORDER BY snapshot_date
+        """,
+    )
+    assert rows == [
+        ("median", pytest.approx(100 / 200)),
+        ("low", pytest.approx(100 / 100)),
+        ("high", pytest.approx(200 / 300)),
+    ]
 
 
 def test_classification(features_world):

@@ -37,7 +37,8 @@ README.md §Data source).
 ### Point-in-time rules (critical)
 
 - Use **as-reported dimensions** (`ARQ` / `ART`) from SF1. Never use `MRQ`/`MRT`/`MRY`
-  for features — they incorporate restatements (lookahead).
+  for features — they incorporate restatements (lookahead; the
+  deployment-consistency and restatement-timing rationale is decision 0009).
 - The event date for a fundamentals row is **`datekey`** (the SEC filing date),
   *not* `reportperiod` (fiscal period end) and *not* `calendardate` (normalized
   quarter end). A fundamentals row becomes usable **the first trading day strictly
@@ -115,6 +116,9 @@ final registry in `docs/features.md`):
    with/without ablation in walk-forward validation; value must be demonstrated
    across multiple regimes.
 7. **Classification columns:** Sharadar sector, industry, Fama-French industry.
+   TICKERS metadata is current-state, not historical — reclassified firms get
+   today's label retroactively; accepted v1 caveat with `siccode` as the
+   era-stable fallback (edges spelled out in docs/features.md §Classification).
 
 **Feature representation:** every numeric feature is stored twice —
 raw value AND **cross-sectional rank (percentile) within snapshot date**

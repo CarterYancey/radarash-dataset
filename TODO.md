@@ -94,6 +94,12 @@ Each produces a short writeup in `docs/decisions/`.
 - [x] Minimum-data filters for snapshots (PLAN.md §3): **no filing
       requirement** — `has_filing_183d`/`has_filing_365d` flags instead
       → folded into `docs/decisions/0006` *(accepted)*.
+- [x] As-reported vs restated ("what they actually had") features:
+      **as-reported (ARQ/ART) only** — deployment consistency, restatement
+      timing embeds the label, and the reported-vs-actual gap is the
+      quality family's signal → `docs/decisions/0009`. A restated-variant
+      diagnostic ablation is registered there as a `value-ml-models` task
+      (same purged splits; diagnostic only, never shipped).
 - [x] Rank features within-date only, or within-date-and-sector?
       **Within (calendar quarter, snapshot_kind)**, `percent_rank`,
       thin-slice guard 20; sector variant for an allowlist

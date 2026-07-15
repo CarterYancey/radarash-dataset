@@ -18,8 +18,12 @@ versions diffable from the registry alone.
 ## Conventions (apply to every feature unless its row says otherwise)
 
 - **Key:** `(permaticker, snapshot_date, snapshot_kind)` — same as
-  `labels.parquet`. One row per snapshot; the three same-quarter kinds share
-  fundamentals but not price-based features.
+  `labels.parquet`. One row per snapshot. Fundamentals resolve strictly per
+  `snapshot_date` (decision 0001: no special casing per kind): the three
+  same-quarter kinds *usually* share a quarter's fundamentals, but a filing
+  whose `datekey` lands between two kinds' snapshot dates puts those kinds on
+  different filings — point-in-time-correct by design. Price-based features
+  always differ across kinds.
 - **Point-in-time:** fundamentals come from the freshest as-reported row
   with `datekey < snapshot_date` (usable strictly after the filing date,
   PLAN §2). Flow ("ttm") inputs are **ART**; point-in-time levels ("q") are
@@ -183,6 +187,16 @@ composite is deferred (ADR 0003) — its components are all above.
 | `famaindustry` | TICKERS | FF-48-style; G-score peer grouping |
 | `scalemarketcap` | TICKERS | size bucket, current-state |
 | `siccode` | TICKERS | fallback for era-stable industry mapping |
+
+Current-state means three accepted (v1) edges: a reclassified firm's whole
+history gets today's label; delisted firms' labels **freeze at delisting**
+while survivors' keep refreshing (a faint survivorship echo confined to
+these columns); and at assembly the `_secrank` cross-sections group
+historical rows by current-state sector — mild lookahead through
+peer-group *identity* only, never through the ranked firm's own values.
+`siccode` (assigned at registration, era-stable) is the stored fallback.
+Revisit if material drift ever shows up — measurable as a cross-export
+diff once two ingest vintages exist.
 
 ## Build order (`src/features/`, research §F8.2)
 
