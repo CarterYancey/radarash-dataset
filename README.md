@@ -156,9 +156,10 @@ make splits          # or: uv run sharadar-splits --help
 
 Produces under `data/interim/`: `splits.parquet` (per-horizon purged +
 embargoed role tags — train/test/purged/embargoed — for the sealed holdout
-and expanding walk-forward folds) and `split_folds.parquet` (the frozen
-fold manifest). Tags, never filters: no row is dropped. Definitions:
-`docs/splits.md`.
+and expanding walk-forward folds, plus the diagnostic-only
+`entity_holdout`/`random_kfold` schemes) and `split_folds.parquet` (the
+frozen fold manifest). Tags, never filters: no row is dropped.
+Definitions: `docs/splits.md`.
 
 ### 6. Run the QA reports (feature-research inputs)
 
@@ -166,10 +167,11 @@ fold manifest). Tags, never filters: no row is dropped. Definitions:
 make qa              # or: uv run sharadar-qa {coverage,staleness,daily-pit} --help
 ```
 
-Three data-gated reports feeding the pre-M4 research questions
-(`docs/research/features.md`): fundamentals coverage / depth-tier survival /
-null rates, staleness vs. label outcomes, and the V7 check on whether
-`DAILY` is point-in-time safe. Detail parquet lands under `data/interim/qa/`;
+Four data-gated reports: fundamentals coverage / depth-tier survival /
+null rates and staleness vs. label outcomes (pre-M4 research inputs,
+`docs/research/features.md`), the V7 check on whether `DAILY` is
+point-in-time safe, and the PLAN §7.7 split-overlap diagnostics
+(`docs/research/splits.md`). Detail parquet lands under `data/interim/qa/`;
 committable markdown + CSV summaries under `docs/research/reports/` — commit
 those to share a run's results.
 

@@ -11,6 +11,10 @@ Produces under data/interim/:
 
     splits.parquet                     (scheme, fold, horizon, snapshot) -> role
     split_folds.parquet                frozen fold manifest with role counts
+
+Schemes: sealed `holdout` + expanding `walkforward` (purged/embargoed,
+decision 0011) and the diagnostic-only `entity_holdout` / `random_kfold`
+(unpurged by design, decision 0010 — never for model selection).
 """
 
 from __future__ import annotations
@@ -24,6 +28,7 @@ import duckdb
 
 from labels.paths import HORIZON_YEARS
 
+from .diagnostics import build_diag_views
 from .folds import (
     EMBARGO_DAYS,
     HOLDOUT_YEARS,
@@ -132,6 +137,7 @@ def main(argv: list[str] | None = None) -> int:
             min_train_years=args.min_train_years,
         )
         build_tag_view(con)
+        build_diag_views(con)
         write_splits_table(con, interim_dir)
         write_folds_table(con, interim_dir)
     finally:

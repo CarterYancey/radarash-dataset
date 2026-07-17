@@ -1,4 +1,4 @@
-"""Role assignment per (scheme, fold, horizon) (PLAN.md §7.2, decision 0010).
+"""Role assignment per (scheme, fold, horizon) (PLAN.md §7.2, decision 0011).
 
 For a fold with test period [test_start, test_end), horizon H and embargo E:
 
@@ -17,6 +17,9 @@ absence means out of fold. Nominal `snapshot_date + H` bounds the label
 information from above — the terminal averaging window is trailing and the
 horizon end never lands after the nominal end (docs/labels.md) — so the
 purge condition is exact-or-conservative, never leaky.
+
+The diagnostic-only schemes (`diagnostics.py`) use train/test roles with no
+purge at all; `write_splits_table` emits both alongside each other.
 """
 
 from __future__ import annotations
@@ -76,7 +79,9 @@ def write_splits_table(
         COPY (
             SELECT scheme, fold, horizon_years,
                    permaticker, snapshot_date, snapshot_kind, role
-            FROM split_tags
+            FROM (SELECT * FROM split_tags
+                  UNION ALL
+                  SELECT * FROM diag_tags)
             ORDER BY scheme, horizon_years, fold,
                      permaticker, snapshot_date, snapshot_kind
         )
@@ -87,7 +92,7 @@ def write_splits_table(
     per_role = con.execute(
         """
         SELECT scheme, role, count(*)
-        FROM split_tags
+        FROM (SELECT * FROM split_tags UNION ALL SELECT * FROM diag_tags)
         GROUP BY scheme, role
         ORDER BY scheme, role
         """

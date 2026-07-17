@@ -1,4 +1,4 @@
-"""Fold calendar derivation (PLAN.md §7.3, decision 0010).
+"""Fold calendar derivation (PLAN.md §7.3, decision 0011).
 
 Calendar-year test periods, `fold` = test start year. Per horizon:
 
@@ -126,8 +126,13 @@ def write_folds_table(
                    count(*) FILTER (t.role = 'test') AS n_test,
                    count(*) FILTER (t.role = 'purged') AS n_purged,
                    count(*) FILTER (t.role = 'embargoed') AS n_embargoed
-            FROM split_folds f
-            LEFT JOIN split_tags t USING (scheme, fold, horizon_years)
+            FROM (SELECT * FROM split_folds
+                  UNION ALL
+                  SELECT * FROM diag_folds) f
+            LEFT JOIN (SELECT * FROM split_tags
+                       UNION ALL
+                       SELECT * FROM diag_tags) t
+                USING (scheme, fold, horizon_years)
             GROUP BY ALL
             ORDER BY scheme, horizon_years, fold
         )
@@ -139,7 +144,7 @@ def write_folds_table(
         """
         SELECT scheme, horizon_years, count(*) AS folds,
                min(fold) AS first_fold, max(fold) AS last_fold
-        FROM split_folds
+        FROM (SELECT * FROM split_folds UNION ALL SELECT * FROM diag_folds)
         GROUP BY scheme, horizon_years
         ORDER BY scheme, horizon_years
         """
@@ -149,7 +154,7 @@ def write_folds_table(
     for scheme, horizon_years, folds, first_fold, last_fold in per_scheme:
         counts[f"{scheme}_{horizon_years}y_folds"] = int(folds)
         logger.info(
-            "folds %s %dy: %d fold(s), test years %d..%d",
+            "folds %s %dy: %d fold(s) [%s..%s]",
             scheme, horizon_years, folds, first_fold, last_fold,
         )
     logger.info("fold manifest: %d rows -> %s", rows, folds_path)

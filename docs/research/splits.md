@@ -9,6 +9,9 @@ which turned the remaining disagreements into measurements.
 Status 2026-07-17: diagnostics implemented (`sharadar-qa splits-diag`,
 PLAN §7.7) and fixture-tested; **not yet run against real data** — run it
 after the first real `make features` pass and record findings below.
+The M5 tagging (`make splits`, decision 0011) now emits the diagnostic-only
+`entity_holdout` / `random_kfold` schemes alongside `holdout`/`walkforward`,
+so the leakage-gap experiment below is unblocked once `dataset_v1.0` ships.
 
 ## The debate, compressed
 

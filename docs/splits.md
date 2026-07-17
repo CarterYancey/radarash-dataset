@@ -8,16 +8,17 @@ Produced by `sharadar-splits` (`src/splits/`), consuming
 - `split_folds.parquet` — the frozen fold manifest (one row per
   scheme × fold × horizon, with boundaries and role counts)
 
-Design decisions: [decisions/0010](decisions/0010-split-tagging.md);
-theory in PLAN.md §7. Splits are **tags, never filters** — no labels or
-features row is dropped.
+Design decisions: [decisions/0011](decisions/0011-split-tagging.md)
+(tagging mechanics) and [decisions/0010](decisions/0010-split-scheme-diagnostics.md)
+(diagnostic-only schemes); theory in PLAN.md §7. Splits are **tags, never
+filters** — no labels or features row is dropped.
 
 ## `splits.parquet` columns
 
 | column | type | meaning |
 |---|---|---|
-| `scheme` | varchar | `holdout` \| `walkforward` (`cpcv` reserved for v2) |
-| `fold` | integer | test-period start year (calendar-year folds) |
+| `scheme` | varchar | `holdout` \| `walkforward` \| `entity_holdout` \| `random_kfold` (`cpcv` reserved for v2) |
+| `fold` | integer | test-period start year (temporal schemes) or bucket index 0–4 (diagnostic schemes) |
 | `horizon_years` | integer | the label horizon this tag applies to |
 | `permaticker` | — | snapshot key, as in `labels.parquet` |
 | `snapshot_date` | — | snapshot key |
@@ -63,10 +64,32 @@ latest snapshot year with an observable label at that horizon:
 
 Defaults: `--embargo-days 30`, `--holdout-years 3`, `--min-train-years 5`.
 
+## Diagnostic-only schemes (decision 0010, PLAN §7.3 items 4–5)
+
+Tagged so the §7.7 leakage-gap experiment (`value-ml-models`) can run;
+**never** used for model selection or reported performance:
+
+- **`entity_holdout`** — permatickers hashed into 5 buckets
+  (`hash(permaticker) % 5`); bucket 0 is the held-out entity set (one
+  fold). Train = all rows of other buckets; test = bucket-0 median
+  observable rows. The §7.4 firm-identity-memorization diagnostic.
+- **`random_kfold`** — rows hashed into 5 folds
+  (`hash(permaticker, snapshot_date, snapshot_kind) % 5`); per fold,
+  train = the other 4 buckets (all kinds), test = the fold's median
+  observable rows. Deliberately unpurged — the leaky baseline.
+
+Both use roles `train`/`test` only (nothing is purged or embargoed), share
+the temporal schemes' test conventions (median kind, observable label), and
+cover only the **pre-holdout region per horizon** (`snapshot_date <`
+holdout `test_start`), so the sealed temporal holdout is never consumed by
+the experiment, even as training data.
+
 ## `split_folds.parquet` columns
 
 `scheme`, `fold`, `horizon_years`, `test_start`, `test_end`,
 `embargo_days`, `n_train`, `n_test`, `n_purged`, `n_embargoed`.
+Diagnostic-scheme rows carry NULL `test_start`/`test_end`/`embargo_days`
+(their folds are not temporal) and always-zero purge/embargo counts.
 
 This manifest is the frozen fold definition: downstream code selects
 training data as `role = 'train'` for a (scheme, fold, horizon) and must

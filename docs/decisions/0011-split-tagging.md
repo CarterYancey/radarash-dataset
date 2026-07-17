@@ -1,6 +1,7 @@
-# 0010 — Purged/embargoed split tagging: schema, fold schedule, embargo
+# 0011 — Purged/embargoed split tagging: schema, fold schedule, embargo
 
-Date: 2026-07-15
+Date: 2026-07-15 (renumbered 2026-07-17; the concurrent split-methodology
+debate took 0010 → [0010-split-scheme-diagnostics](0010-split-scheme-diagnostics.md))
 Status: accepted
 
 ## Context
@@ -109,6 +110,30 @@ definition, and the physical schema.
    observable snapshot year per horizon, from `labels.parquet`) plus the
    three parameters — no hardcoded dates — and frozen into the manifest at
    build time.
+
+7. **Diagnostic-only schemes** (mandated by decision 0010, PLAN §7.3
+   items 4–5) are emitted by the same module, same schema:
+   - `entity_holdout`: permatickers are hashed into 5 buckets
+     (deterministic `hash(permaticker) % 5`); bucket 0 is the held-out
+     entity set, one fold (`fold = 0`). Train = every row of the other
+     buckets; test = bucket-0 rows (median kind, observable — the test
+     conventions match the temporal schemes so score gaps are attributable
+     to the split, not the evaluation).
+   - `random_kfold`: rows are hashed into 5 folds (deterministic
+     `hash(permaticker, snapshot_date, snapshot_kind) % 5`); per fold,
+     train = the other 4 buckets (all kinds), test = the fold's median
+     observable rows. Deliberately **unpurged and unembargoed** — being
+     leaky is its purpose as the baseline of the §7.7 leakage-gap
+     experiment.
+   - Both schemes are restricted to the **pre-holdout region per horizon**
+     (`snapshot_date < holdout test_start(H)`): the sealed temporal holdout
+     is not consumed by the experiment even as training data, so the seal's
+     meaning survives the diagnostics (0010's "neither achieved by burning
+     the sealed holdout").
+   - Roles are `train`/`test` only; `purged`/`embargoed` never appear.
+     Manifest rows carry NULL `test_start`/`test_end`/`embargo_days` (the
+     folds are not temporal). Never used for model selection or reported
+     performance (0010, PLAN §7.3).
 
 ## Consequences
 

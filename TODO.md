@@ -47,22 +47,22 @@ M5 split tagging shipped (2026-07-15): `src/splits/` tags per-horizon
 purged + embargoed roles for the sealed `holdout` and expanding
 `walkforward` schemes (calendar-year folds, median-only test rows, tags
 never filters) → `splits.parquet` + frozen fold manifest
-`split_folds.parquet`. Design: `docs/decisions/0010`; canonical
+`split_folds.parquet`. Design: `docs/decisions/0011`; canonical
 definitions: `docs/splits.md`. Run `make splits` after the first
 real-data build and sanity-check the logged fold calendar.
+
+Split-methodology debate resolved 2026-07-17 (ADR 0010, PLAN §7.7):
+the empirical questions became `sharadar-qa splits-diag` (implemented,
+fixture-tested; workspace `docs/research/splits.md`), and the tagging
+emits the diagnostic-only `entity_holdout` / `random_kfold` schemes
+(mechanics in ADR 0011 §7) for the leakage-gap experiment registered as a
+`value-ml-models` task. Still pending: run `splits-diag` on real data
+after `make features` and record findings in the workspace.
 
 Remaining in M5: assembly (families × labels × splits join,
 registry-driven ranks/sector-ranks per ADR 0008, `mohanram_g7` and
 `conservative_score`, uniqueness weights — the `sample_weight` open
 question below), and `dataset_v1.0` end-to-end by one command.
-
-Split-methodology debate resolved 2026-07-17 (ADR 0010, PLAN §7.7):
-diagnostics implemented as `sharadar-qa splits-diag` (fixture-tested;
-workspace `docs/research/splits.md`). Before M5 splits code: run it on real
-data after `make features` and record findings in the workspace. M5 tagging
-now also emits the diagnostic-only `entity_holdout` and `random_kfold`
-schemes; the leakage-gap experiment is registered as a `value-ml-models`
-task.
 
 ## Verification tasks (do these before trusting anything)
 

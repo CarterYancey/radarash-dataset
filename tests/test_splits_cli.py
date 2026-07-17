@@ -87,7 +87,8 @@ def test_fold_manifest(splits_world):
         """
         SELECT scheme, fold, horizon_years, test_start, test_end,
                n_train, n_test, n_purged, n_embargoed
-        FROM {t} ORDER BY scheme, horizon_years, fold
+        FROM {t} WHERE scheme IN ('holdout', 'walkforward')
+        ORDER BY scheme, horizon_years, fold
         """,
     )
     # Row counts hand-derived from the world's 105 snapshots (GROW 84,
@@ -139,7 +140,8 @@ def test_role_conditions_hold_everywhere(splits_world):
         SELECT count(*)
         FROM '{splits_path}' s
         JOIN '{folds_path}' f USING (scheme, fold, horizon_years)
-        WHERE s.role <> CASE
+        WHERE s.scheme IN ('holdout', 'walkforward')
+          AND s.role <> CASE
             WHEN s.snapshot_date < f.test_start THEN CASE
                 WHEN s.snapshot_date + to_years(s.horizon_years)
                      + to_days(f.embargo_days) < f.test_start THEN 'train'
@@ -252,6 +254,98 @@ def test_low_high_never_test_but_do_train(splits_world):
     )
     assert row[0] > 0
     assert row[1] == 0
+
+
+def test_diag_fold_manifest(splits_world):
+    # entity_holdout: one fold x 4 horizons; random_kfold: 5 folds x 4
+    # horizons. Not temporal: NULL boundaries, nothing purged/embargoed.
+    rows = query(
+        splits_world,
+        "split_folds",
+        """
+        SELECT scheme, count(*),
+               count(test_start) + count(test_end) + count(embargo_days),
+               sum(n_purged) + sum(n_embargoed)
+        FROM {t} WHERE scheme IN ('entity_holdout', 'random_kfold')
+        GROUP BY scheme ORDER BY scheme
+        """,
+    )
+    assert rows == [("entity_holdout", 4, 0, 0), ("random_kfold", 20, 0, 0)]
+
+
+def test_diag_roles_are_train_test_only(splits_world):
+    rows = query(
+        splits_world,
+        "splits",
+        """
+        SELECT DISTINCT role FROM {t}
+        WHERE scheme IN ('entity_holdout', 'random_kfold')
+        ORDER BY role
+        """,
+    )
+    assert rows == [("test",), ("train",)] or rows == [("train",)]
+
+
+def test_entity_holdout_is_entity_disjoint(splits_world):
+    # No permaticker may appear on both sides of the entity split.
+    (overlap,) = one_row(
+        splits_world,
+        "splits",
+        """
+        SELECT count(*) FROM (
+            SELECT permaticker FROM {t}
+            WHERE scheme = 'entity_holdout' AND role = 'train'
+            INTERSECT
+            SELECT permaticker FROM {t}
+            WHERE scheme = 'entity_holdout' AND role = 'test'
+        )
+        """,
+    )
+    assert overlap == 0
+
+
+def test_diag_schemes_never_touch_the_holdout_region(splits_world):
+    # The sealed temporal holdout must not be consumed by the diagnostics,
+    # even as training data (decision 0010/0011).
+    splits_path = splits_world / "interim" / "splits.parquet"
+    folds_path = splits_world / "interim" / "split_folds.parquet"
+    (rows,) = duckdb.sql(
+        f"""
+        SELECT count(*)
+        FROM '{splits_path}' s
+        JOIN (SELECT horizon_years, test_start FROM '{folds_path}'
+              WHERE scheme = 'holdout') h USING (horizon_years)
+        WHERE s.scheme IN ('entity_holdout', 'random_kfold')
+          AND s.snapshot_date >= h.test_start
+        """
+    ).fetchall()[0]
+    assert rows == 0
+
+
+def test_random_kfold_partitions_every_row(splits_world):
+    # Each pre-holdout row sits in exactly one of the 5 buckets, so it must
+    # be tagged train in exactly the other 4 folds — no more, no fewer.
+    rows = query(
+        splits_world,
+        "splits",
+        """
+        SELECT min(trains), max(trains) FROM (
+            SELECT count(*) AS trains FROM {t}
+            WHERE scheme = 'random_kfold' AND role = 'train'
+              AND horizon_years = 1
+            GROUP BY permaticker, snapshot_date, snapshot_kind
+        )
+        """,
+    )
+    assert rows == [(4, 4)]
+
+
+def test_splits_output_is_deterministic(splits_world):
+    splits_path = splits_world / "interim" / "splits.parquet"
+    before = duckdb.sql(f"SELECT * FROM '{splits_path}' ORDER BY ALL").fetchall()
+    assert splits_cli.main(["--data-dir", str(splits_world), *SPLIT_ARGS]) == 0
+    after = duckdb.sql(f"SELECT * FROM '{splits_path}' ORDER BY ALL").fetchall()
+    assert before == after
 
 
 def test_missing_inputs(tmp_path):
