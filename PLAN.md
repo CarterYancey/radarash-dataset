@@ -267,6 +267,51 @@ preventing dense periods and long horizons from being overrepresented, and the
 summed weights give an honest effective-sample-size estimate per era as a
 byproduct (published in the QA report).
 
+**Walk-forward fold shape ("boundary-local" made concrete).** Each fold is a
+purged, embargoed analogue of one split in scikit-learn's `TimeSeriesSplit`
+(a k-fold variant that only ever tests on data later than what it trained
+on): the training set is a single **contiguous prefix** of history, purging
+strips a `horizon + embargo`-wide slice immediately before the test period,
+and the interior of that prefix is untouched. Example: 3y horizon, 1-month
+embargo, test year 2015 —
+
+```
+1998 ═══════ train (contiguous) ═══════ 2011-12-01 ░ purged/embargoed ░ 2015-01-01 ── test ── 2016-01-01
+```
+
+Advance the boundary a year and the next fold trains on 1998→2012-12,
+purges 2012-12→2016, tests on 2016 — the training prefix grows, the purge
+strip slides with it. Two things follow directly from this shape:
+
+- **A purged row is only purged locally.** The 2013-Q2 snapshot is inside
+  the purge strip for the 2015 and 2016 folds (its label window reaches
+  into both test periods) but was itself a *test* row in the 2013 fold and
+  becomes an ordinary *training* row from the 2017 fold on. Roll the full
+  walk-forward sequence and nearly every row trains in most folds and tests
+  in exactly one — nothing is discarded from the project, only withheld
+  from the specific folds whose test period its label overlaps.
+- **No fold ever trains on scattered non-adjacent years.** Every training
+  set is one unbroken prefix; only where the prefix ends changes across
+  folds. A model is never fit on, say, 1998+2003+2011 in isolation — the
+  "sensitive to which two eras happen to get drawn" scenario doesn't occur
+  under this scheme (it *would* under a random or blocked-non-contiguous
+  split, which is exactly why walk-forward is the default rather than
+  those).
+
+Walk-forward folds pick the model configuration (features, hyperparameters);
+the shipped/deployed model is then refit on *all* eligible data up to the
+present (constrained only by the horizon's own label-observability floor,
+not by any test boundary) — the purge/embargo/holdout discipline constrains
+what's used for *measurement*, not what the final model may learn from.
+
+Per-horizon accounting differs from a naive `horizon + embargo` reading: a
+horizon-H label doesn't exist at all for snapshots newer than
+`last_price_date − H` (no H forward years of price yet), so part of the
+apparent "loss" at long horizons is unavoidable label-observability, not
+purging. The `purge_cost` table in `sharadar-qa splits-diag` (§7.7) reports
+the actual eligible/purged row counts per horizon and boundary rather than
+this back-of-envelope width, so the 5y cost is priced, not assumed.
+
 ### 7.3 Split schemes (tagged in the dataset, consumed downstream)
 
 1. **`holdout`** — final sealed test period: the most recent usable years, per
@@ -318,11 +363,22 @@ report rather than pooling it away.
 
 ### 7.6 Required reading before implementing `src/splits/`
 
-- López de Prado, *Advances in Financial Machine Learning*: ch. 7 (purged k-fold
-  and embargo — exact overlap conditions), ch. 11–12 (backtest dangers, CPCV).
+- López de Prado, *Advances in Financial Machine Learning* (Wiley, 2018,
+  ISBN 978-1119482086): ch. 4 (sample uniqueness/weighting — why within-train
+  overlap is weighted, not purged), ch. 7 (purged k-fold and embargo — exact
+  overlap conditions), ch. 11–12 (backtest dangers, CPCV).
 - Bailey, Borwein, López de Prado, Zhu, "The Probability of Backtest
-  Overfitting" — why the count of configurations tried must be recorded
-  (enforced as an invariant in `value-ml-models`).
+  Overfitting" (*Journal of Computational Finance*, 2017; SSRN 2326253) — why
+  the count of configurations tried must be recorded (enforced as an
+  invariant in `value-ml-models`).
+- Bailey, Borwein, López de Prado, Zhu, "Pseudo-Mathematics and Financial
+  Charlatanism" (*Notices of the AMS*, May 2014) — the short version of the
+  overfitting-by-reuse argument; motivates why the sealed holdout in §7.3
+  is spent at most once per project phase.
+- scikit-learn `TimeSeriesSplit` docs — a minimal reference implementation of
+  the expanding-window fold shape §7.2 elaborates on (its `gap` parameter is
+  a crude fixed-width purge; contrast with per-horizon purging here, which a
+  single shared gap cannot express — see §7.2's eligibility rule).
 
 Notes from the reading go in `docs/decisions/` before the module is written.
 

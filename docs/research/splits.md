@@ -31,6 +31,36 @@ model selection that was supposed to supply the training-time mitigation;
 and a ticker-split **arbiter** rewards exactly the temporal leakage under
 debate — the sealed arbiter must be temporal because deployment is.
 
+## Walk-forward mechanics FAQ
+
+Follow-up question after 0010: doesn't per-horizon purging risk a model
+trained on a scattered, non-adjacent grab-bag of years (e.g. "1997 and
+2003"), making it sensitive to which eras happen to get drawn? No — this
+misreads the fold shape. Full mechanics, diagram, and the k-fold analogy
+are in PLAN §7.2 ("Walk-forward fold shape"); short version:
+
+- Every fold's training set is a single **contiguous prefix** of history
+  (like `sklearn.model_selection.TimeSeriesSplit`, generalized with a
+  per-horizon purge width instead of `TimeSeriesSplit`'s fixed `gap`).
+  Purging only removes the `horizon + embargo`-wide strip immediately
+  before that fold's test boundary — it never touches the interior of the
+  prefix, which is what "boundary-local" means.
+- A row purged from one fold is not purged from the project: it was a test
+  row in an earlier fold and becomes an ordinary training row again once
+  later folds' boundaries pass it. Across the full walk-forward sequence,
+  nearly every row trains in most folds.
+- Walk-forward folds exist to pick the model configuration (features,
+  hyperparameters) via honest, non-leaky measurement. The model that
+  actually ships is refit on all eligible data up to the present — the
+  purge/embargo/holdout discipline constrains measurement, not what the
+  deployed model learns from.
+- The apparent "cost" of purging at long horizons is partly not purging at
+  all: a horizon-H label doesn't exist for snapshots newer than
+  `last_price_date − H`, so some of what looks like purge cost is
+  unavoidable label-observability lag. `purge_cost` (below) separates the
+  two by reporting actual eligible/purged counts rather than a
+  back-of-envelope width.
+
 ## Questions → where they get answered
 
 | # | Question | Diagnostic (report section) |
