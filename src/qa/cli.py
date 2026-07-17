@@ -3,6 +3,7 @@
     sharadar-qa coverage           # features.md §F9 coverage/null-rate report
     sharadar-qa staleness          # §F4.4 staleness × label-bias report
     sharadar-qa daily-pit          # V7: is DAILY point-in-time safe?
+    sharadar-qa splits-diag        # PLAN §7.7 split-overlap diagnostics
 
 Each subcommand reads `data/raw` + `data/interim`, writes machine-readable
 detail under `data/interim/qa/`, and drops a committable markdown report
@@ -31,6 +32,18 @@ from .daily_pit import (
 )
 from .report import write_report, write_view_tables
 from .source import create_qa_source_views, detect_key_fields, parquet_columns
+from .splits_diag import (
+    DEFAULT_EMBARGO_DAYS,
+    DEFAULT_TWIN_SAMPLE,
+    build_feature_variance_views,
+    build_label_structure_views,
+    build_purge_cost_view,
+    build_twin_views,
+    create_splits_source_views,
+    default_test_starts,
+    required_families,
+    splits_diag_report_sections,
+)
 from .staleness import build_staleness_views, staleness_report_sections
 
 logger = logging.getLogger(__name__)
@@ -43,19 +56,22 @@ _HINTS = {
     "universe": "run `sharadar-identity`",
     "snapshots": "run `sharadar-labels`",
     "labels": "run `sharadar-labels`",
+    "features": "run `sharadar-features`",
 }
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="sharadar-qa",
-        description="Data-gated QA reports (coverage, staleness, DAILY PIT).",
+        description="Data-gated QA reports (coverage, staleness, DAILY PIT, "
+        "splits diagnostics).",
     )
     sub = parser.add_subparsers(dest="command", required=True)
     for name, help_text in (
         ("coverage", "per-year/sector fundamentals coverage, depth-tier survival, null rates"),
         ("staleness", "fundamentals staleness buckets vs. 1y label outcomes"),
         ("daily-pit", "V7: check whether DAILY historical rows are point-in-time safe"),
+        ("splits-diag", "PLAN §7.7: intra-quarter variance, label overlap, twin test, purge cost"),
     ):
         cmd = sub.add_parser(name, help=help_text)
         cmd.add_argument(
@@ -88,6 +104,28 @@ def build_parser() -> argparse.ArgumentParser:
                 type=int,
                 default=DEFAULT_SAMPLE_TICKERS,
                 help=f"Deterministic ticker sample size (default: {DEFAULT_SAMPLE_TICKERS})",
+            )
+        if name == "splits-diag":
+            cmd.add_argument(
+                "--embargo-days",
+                type=int,
+                default=DEFAULT_EMBARGO_DAYS,
+                help="Embargo added to the horizon in the purge-cost table "
+                f"(default: {DEFAULT_EMBARGO_DAYS})",
+            )
+            cmd.add_argument(
+                "--test-starts",
+                default=None,
+                help="Comma-separated test-boundary dates (YYYY-MM-DD) for "
+                "the purge-cost table (default: yearly Jan 1 boundaries "
+                "derived from the snapshot span)",
+            )
+            cmd.add_argument(
+                "--twin-sample",
+                type=int,
+                default=DEFAULT_TWIN_SAMPLE,
+                help="Deterministic row sample size for the twin test "
+                f"(default: {DEFAULT_TWIN_SAMPLE})",
             )
     return parser
 
@@ -234,10 +272,76 @@ def run_daily_pit(args: argparse.Namespace) -> int:
     return 0
 
 
+def run_splits_diag(args: argparse.Namespace) -> int:
+    from datetime import date
+
+    interim = args.data_dir / "interim"
+    inputs = {
+        "snapshots": interim / "snapshots.parquet",
+        "labels": interim / "labels.parquet",
+    }
+    features_dir = interim / "features"
+    missing = _missing_inputs(inputs)
+    for family in required_families():
+        path = features_dir / f"{family}.parquet"
+        if not path.exists():
+            logger.error("missing input: %s — %s", path, _HINTS["features"])
+            missing = True
+    if missing:
+        return 2
+
+    con = _connect(interim, args.memory_limit)
+    try:
+        create_splits_source_views(
+            con,
+            snapshots_parquet=inputs["snapshots"],
+            labels_parquet=inputs["labels"],
+            features_dir=features_dir,
+        )
+        build_feature_variance_views(con)
+        build_label_structure_views(con)
+        build_twin_views(con, sample_size=args.twin_sample)
+        if args.test_starts:
+            test_starts = [
+                date.fromisoformat(part.strip())
+                for part in args.test_starts.split(",")
+                if part.strip()
+            ]
+        else:
+            test_starts = default_test_starts(con)
+        if not test_starts:
+            logger.error("no snapshot dates to derive purge-cost boundaries from")
+            return 2
+        build_purge_cost_view(
+            con, test_starts=test_starts, embargo_days=args.embargo_days
+        )
+
+        qa_dir = interim / "qa"
+        write_view_tables(con, "twin_pairs", "twin_pairs", qa_dir)
+        for view in (
+            "feature_intraquarter",
+            "filing_straddle",
+            "label_kind_flip",
+            "label_variance_decomposition",
+            "label_serial_correlation",
+            "twin_relations",
+            "twin_label_corr",
+            "purge_cost",
+        ):
+            write_view_tables(con, view, view, qa_dir, csv_dir=args.report_dir)
+        write_report(
+            args.report_dir / "splits_diag.md", splits_diag_report_sections(con)
+        )
+    finally:
+        con.close()
+    return 0
+
+
 _COMMANDS = {
     "coverage": run_coverage,
     "staleness": run_staleness,
     "daily-pit": run_daily_pit,
+    "splits-diag": run_splits_diag,
 }
 
 

@@ -19,6 +19,7 @@ qa:
 	uv run sharadar-qa coverage
 	uv run sharadar-qa staleness
 	uv run sharadar-qa daily-pit
+	uv run sharadar-qa splits-diag
 
 test:
 	uv run pytest
