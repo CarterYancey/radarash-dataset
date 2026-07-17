@@ -27,7 +27,7 @@ make identity           # ticker↔permaticker mapping + universe
 make labels             # snapshots + label matrix
 make features           # per-family feature tables (needs labels)
 make splits             # purged/embargoed split tags (needs labels)
-make qa                 # data-gated QA reports (coverage, staleness, DAILY PIT)
+make qa                 # data-gated QA reports (coverage, staleness, DAILY PIT, splits diagnostics)
 ```
 
 `data/` is git-ignored and empty in a fresh clone — everything must be
@@ -41,8 +41,8 @@ src/ingest/      table registry (tables.py), download, CSV→parquet conversion
 src/identity/    tickers dedup (source.py), mapping, universe, year counts
 src/labels/      source views, snapshots, delistings, paths (stage 1), compute (stage 2), cli
 src/features/    registry.py (1:1 with docs/features.md), base (as-of + lags), market, 8 family modules, output (registry-validated writer), cli
-src/splits/      fold calendar (folds.py), role tagging (tags.py), cli — PLAN.md §7 + decision 0010 required reading
-src/qa/          data-gated QA reports (sharadar-qa): coverage/null rates (F9), staleness×labels, DAILY PIT check (V7)
+src/splits/      fold calendar (folds.py), role tagging (tags.py), diagnostic schemes (diagnostics.py), cli — PLAN.md §7 + decisions 0010/0011 required reading
+src/qa/          data-gated QA reports (sharadar-qa): coverage/null rates (F9), staleness×labels, DAILY PIT check (V7), splits diagnostics (§7.7)
 tests/           synthetic-fixture tests; conftest.py has shared TICKERS fixtures
 ```
 
