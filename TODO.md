@@ -40,6 +40,14 @@ Still open in M4: **V5** (bank/insurer separation half) and a real-data
 registry-driven ranks/sector-ranks per ADR 0008, `mohanram_g7` and
 `conservative_score`, uniqueness weights), and `dataset_v1.0` end-to-end.
 
+Split-methodology debate resolved 2026-07-17 (ADR 0010, PLAN §7.7):
+diagnostics implemented as `sharadar-qa splits-diag` (fixture-tested;
+workspace `docs/research/splits.md`). Before M5 splits code: run it on real
+data after `make features` and record findings in the workspace. M5 tagging
+now also emits the diagnostic-only `entity_holdout` and `random_kfold`
+schemes; the leakage-gap experiment is registered as a `value-ml-models`
+task.
+
 ## Verification tasks (do these before trusting anything)
 
 Each produces a short writeup in `docs/decisions/`.
@@ -109,6 +117,15 @@ Each produces a short writeup in `docs/decisions/`.
 - [ ] Min/max terminal-price labels: keep, or drop after sensitivity analysis?
 - [ ] Market-regime features (PLAN.md §5.6): include in v1 feature set (with
       ablation requirement) or defer?
+- [x] Is the §7 purged/temporal methodology worth its data cost, or should a
+      ticker-split validation set arbitrate splitting strategies? **Temporal
+      seal stays the arbiter; `entity_holdout`/`random_kfold` tagged as
+      diagnostic-only schemes; the open empirical questions became the
+      `sharadar-qa splits-diag` report + a registered leakage-gap experiment
+      in `value-ml-models`** → `docs/decisions/0010` *(accepted; workspace
+      `docs/research/splits.md` — real-data run still pending)*.
 - [ ] Uniqueness-weight definition details: exact overlap counting for the
       `sample_weight` column (de Prado ch. 4), and whether the three
       low/median/high snapshots share a weight pool with each other.
+      (`splits-diag`'s label decomposition and twin test are direct inputs
+      to this.)

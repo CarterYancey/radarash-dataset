@@ -282,6 +282,21 @@ byproduct (published in the QA report).
    one walk-forward path is a single draw of history. The tagging schema
    `(scheme, fold, horizon) → {train | test | purged | embargoed}` must not
    preclude it, but no v1 implementation.
+4. **`entity_holdout`** *(diagnostic-only, decision 0010)* — a fixed set of
+   permatickers held out across all time. Never an arbiter: it shares every
+   era with the training data, so a temporally-leaky model scores *better*
+   on it, not worse (§7.4). Tagged so downstream can measure firm-identity
+   memorization and its side of the leakage-gap experiment (§7.7).
+5. **`random_kfold`** *(diagnostic-only, decision 0010)* — a uniform random
+   row partition, deliberately leaky. Exists purely as the baseline of the
+   leakage-gap experiment (§7.7): the score gap between this and purged
+   walk-forward *is* the measured size of the overlap leakage.
+
+Schemes 4–5 must never be used for model selection or reported as
+performance; the sealed `holdout` (temporal) remains the only arbiter,
+because whatever one believes about overlap leakage, deployment is always
+on dates later than all training data — "later data" is the one test whose
+meaning doesn't depend on the outcome of that debate.
 
 ### 7.4 What splitting by ticker does NOT solve
 
@@ -290,6 +305,8 @@ the dependence is temporal: MSFT-2015 in test shares its market path with
 AAPL-2015 in train. Entity splits are at most a supplementary diagnostic for
 firm-identity memorization, never a substitute for temporal purging. The same
 permaticker in both train and test is acceptable *provided* windows are purged.
+The `entity_holdout` scheme (§7.3) exists to run exactly this diagnostic —
+not to replace temporal splits.
 
 ### 7.5 Consequences accepted up front
 
@@ -308,6 +325,28 @@ report rather than pooling it away.
   (enforced as an invariant in `value-ml-models`).
 
 Notes from the reading go in `docs/decisions/` before the module is written.
+
+### 7.7 Empirical diagnostics — measure the overlap, don't just assert it
+
+The §7.1 dependence claims and the §7.2 purge cost are empirical quantities,
+and they were challenged (is the entry-price gradient enough variation? is
+cross-sectional overlap real? what does purging actually cost per horizon?).
+Decision 0010 resolves the challenge by making it falsifiable rather than
+rhetorical, in two parts:
+
+1. **`sharadar-qa splits-diag`** (data-gated report; workspace
+   `docs/research/splits.md`): per-feature intra-quarter variation across
+   snapshot kinds and filing-straddle counts; label variance decomposition
+   (entry-price-gradient share vs. calendar-quarter fixed effect), same-stock
+   serial label correlation by lag, and low/high label flip rates; a
+   nearest-neighbor "twin test" for row uniqueness; and a purge-cost table
+   pricing `snapshot_date + horizon + embargo < test_start` per boundary.
+2. **The leakage-gap experiment** (registered for `value-ml-models`, after
+   `dataset_v1.0`): train identical models under `random_kfold`,
+   `entity_holdout`, and purged `walkforward`; the score gaps *are* the
+   measured leakage. If the gaps come out negligible, the methodology can be
+   relaxed with evidence; if large, the §7 rules stand with evidence. Either
+   way the sealed temporal holdout stays sealed while the question is open.
 
 ## 8. Non-goals (this repo)
 
