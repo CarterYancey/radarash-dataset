@@ -12,6 +12,7 @@ classification. Parquet + DuckDB only; no services, no database.
 | `TODO.md` | Task register: milestones, verification tasks V1–V6, open questions. |
 | `docs/decisions/` | ADRs for resolved questions. Skim titles; read the ones your module touches. |
 | `docs/labels.md` | Canonical label/snapshot column definitions. Update it whenever the labels schema changes. |
+| `docs/splits.md` | Canonical split-tag definitions (roles, fold calendar). Update it whenever the splits schema changes. |
 | `docs/features.md` | Canonical feature registry (one row per feature). Must stay 1:1 with `src/features/registry.py`; update both together. |
 | `docs/research/` | Research workspaces (feature-set research pre-M4 → `features.md` there). Findings go here, not in README/PLAN. |
 | `README.md` | Human-facing overview + how to run. Keep it high-level; don't let detail accumulate there. |
@@ -25,6 +26,7 @@ make ingest             # bulk download (needs NASDAQ_DATA_LINK_API_KEY; ~40-50 
 make identity           # ticker↔permaticker mapping + universe
 make labels             # snapshots + label matrix
 make features           # per-family feature tables (needs labels)
+make splits             # purged/embargoed split tags (needs labels)
 make qa                 # data-gated QA reports (coverage, staleness, DAILY PIT, splits diagnostics)
 ```
 
@@ -39,13 +41,14 @@ src/ingest/      table registry (tables.py), download, CSV→parquet conversion
 src/identity/    tickers dedup (source.py), mapping, universe, year counts
 src/labels/      source views, snapshots, delistings, paths (stage 1), compute (stage 2), cli
 src/features/    registry.py (1:1 with docs/features.md), base (as-of + lags), market, 8 family modules, output (registry-validated writer), cli
-src/splits/      (M5, not started — PLAN.md §7 is required reading)
+src/splits/      fold calendar (folds.py), role tagging (tags.py), diagnostic schemes (diagnostics.py), cli — PLAN.md §7 + decisions 0010/0011 required reading
 src/qa/          data-gated QA reports (sharadar-qa): coverage/null rates (F9), staleness×labels, DAILY PIT check (V7), splits diagnostics (§7.7)
 tests/           synthetic-fixture tests; conftest.py has shared TICKERS fixtures
 ```
 
 Entry points (pyproject): `sharadar-ingest`, `sharadar-identity`,
-`sharadar-labels`, `sharadar-qa`. New top-level packages must be added to
+`sharadar-labels`, `sharadar-features`, `sharadar-splits`, `sharadar-qa`.
+New top-level packages must be added to
 `[tool.hatch.build.targets.wheel] packages` and get a `make` target.
 
 ## Non-negotiable invariants (PLAN.md has the why)
