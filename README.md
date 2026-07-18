@@ -6,7 +6,8 @@ stock classification models.
 This repo is responsible for everything **up to and including** the production of a
 model-agnostic training dataset. Model training, evaluation, and portfolio
 construction live in a separate repo (`value-ml-models`) that consumes the output
-of this one.
+of this one — start from the **[dataset user manual](docs/manual.md)** if that's
+what you're here for.
 
 ## Goals
 
@@ -77,14 +78,18 @@ sharadar-dataset/
 
 | Milestone | State |
 |---|---|
-| M1 — Ingestion & identity | ✅ code done (verification writeups pending) |
-| M2 — Point-in-time verified | not started |
-| M3 — Labels | ✅ code done (verification writeups pending) |
-| M4 — Features | ✅ code done (ranks + assembly-stage composites land at M5; V5 pending) |
-| M5 — Splits & assembly | ✅ code done (real-data `dataset_v1.0` build + QA report pending) |
+| M1 — Ingestion & identity | ✅ done (verification writeups V2/V3 pending) |
+| M2 — Point-in-time verified | machinery done; V1 writeup pending |
+| M3 — Labels | ✅ done (verification writeups V4/V6 pending) |
+| M4 — Features | ✅ done (V5 bank/insurer half pending) |
+| M5 — Splits & assembly | ✅ done — `dataset_v1.0` built end-to-end, QA reports published |
 
-The task register, verification tasks, and open questions live in
-**[TODO.md](TODO.md)**.
+The pipeline is complete: `make all` produces `dataset_v1.0` from a raw
+ingest, and the QA reports from the real-data run are committed under
+[docs/research/reports/](docs/research/reports/). Remaining work is the
+verification writeups and open questions in **[TODO.md](TODO.md)**;
+model training happens downstream in `value-ml-models`, guided by
+**[docs/manual.md](docs/manual.md)**.
 
 ## Getting started
 
@@ -177,19 +182,17 @@ assembly-stage composites `mohanram_g7` and `conservative_score` (ADR
 `docs/dataset.md`. From an existing ingest, `make all` runs steps 2–6
 end-to-end.
 
-### 7. Run the QA reports (feature-research inputs)
+### 7. Run the QA reports
 
 ```bash
-make qa              # or: uv run sharadar-qa {coverage,staleness,daily-pit} --help
+make qa              # or: uv run sharadar-qa {coverage,staleness,daily-pit,splits-diag} --help
 ```
 
-Four data-gated reports: fundamentals coverage / depth-tier survival /
-null rates and staleness vs. label outcomes (pre-M4 research inputs,
-`docs/research/features.md`), the V7 check on whether `DAILY` is
-point-in-time safe, and the PLAN §7.7 split-overlap diagnostics
-(`docs/research/splits.md`). Detail parquet lands under `data/interim/qa/`;
-committable markdown + CSV summaries under `docs/research/reports/` — commit
-those to share a run's results.
+Four data-gated reports: fundamentals coverage / null rates, staleness vs.
+label outcomes, the V7 `DAILY` point-in-time check, and the PLAN §7.7
+split-overlap diagnostics. Detail parquet lands under `data/interim/qa/`;
+committable markdown + CSV summaries under `docs/research/reports/` — the
+committed copies there are from the 2026-07-18 real-data run.
 
 Query any artifact with DuckDB:
 
@@ -205,6 +208,8 @@ duckdb.sql("SELECT count(*) FROM 'data/interim/labels.parquet'")
 | [PLAN.md](PLAN.md) | Design & theory: objectives, point-in-time rules, universe, snapshots, features, labels, splits |
 | [TODO.md](TODO.md) | Task register: milestones, verification tasks, open questions |
 | [CLAUDE.md](CLAUDE.md) | Orientation for AI agents & developers: conventions, invariants, what to read |
+| [docs/manual.md](docs/manual.md) | **User manual for `value-ml-models`**: how to consume a dataset version honestly |
+| [docs/features.md](docs/features.md) | Canonical feature registry |
 | [docs/labels.md](docs/labels.md) | Canonical label/snapshot column definitions |
 | [docs/splits.md](docs/splits.md) | Canonical split-tag definitions (roles, fold calendar) |
 | [docs/dataset.md](docs/dataset.md) | Canonical dataset column groups, weights, manifest |

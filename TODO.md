@@ -10,68 +10,39 @@ resolved questions get an ADR in `docs/decisions/` and are checked off here.
       *(Code done; V2/V3 writeups still open below.)*
 - [ ] **M2 — Point-in-time verified.** V1 done; as-of join machinery working and
       tested against hand-checked examples.
+      *(Machinery done: `src/features/base` T0 as-of join + lag matching,
+      ADR 0004, fixture-tested. Remaining: the V1 EDGAR spot-check below.)*
 - [ ] **M3 — Labels.** Forward returns with delisting handling; V4, V6 done.
       *(Code done: `src/labels/`, `docs/labels.md`, decisions 0001/0002.
       Remaining: V4, V6 below.)*
 - [ ] **M4 — Features.** Feature families implemented with per-family tests and
       null-rate reports; V5 done.
-      *(Code done: `src/features/` implements the canonical registry in its
-      build order, registry-validated columns, hand-checked fixture tests;
-      null-rate reports = `sharadar-qa coverage`. Ranks and the two
-      assembly-stage composites land at M5 assembly. Remaining: V5 below.)*
-- [ ] **M5 — Splits & assembly.** Purged/embargoed split tagging; `dataset_v1.0`
+      *(Code + real-data coverage pass done: `src/features/` implements the
+      canonical registry, 1:1 enforced; null-rate reports =
+      `sharadar-qa coverage`, committed. Remaining: V5 bank/insurer half below.)*
+- [x] **M5 — Splits & assembly.** Purged/embargoed split tagging; `dataset_v1.0`
       produced end-to-end by one command; QA report published.
+      *(Done 2026-07-18: `make all` real-data build + `make qa`; all four
+      reports committed under `docs/research/reports/`, splits-diag findings
+      recorded in `docs/research/splits.md`. Design: decisions 0010–0013;
+      canonical docs `docs/splits.md` / `docs/dataset.md`.)*
 
-## Next major task: M5 splits & assembly
+## Current state & next
 
-M4 implementation shipped (2026-07-15): `src/features/` implements the
-canonical registry (`docs/features.md` ↔ `registry.py`, 1:1 enforced by
-tests and by the writer) in the build order — foundations `base` (T0 as-of
-join + reportperiod lag matching, ADR 0004) and `market` (self-built
-marketcap/EV, ADR 0007), then the eight families, each writing
-`data/interim/features/{family}.parquet` on the labels key. Staleness is
-metadata + flags, never a filter (ADR 0006). Run with `make features`;
-re-run `make qa` after the first real-data build (per-year/per-tier
-null-rate check, ADR 0004 burn-in).
+All five milestones' code is shipped and `dataset_v1.0` builds end-to-end
+from a raw ingest (`make all`); the 2026-07-18 real-data QA reports are
+committed under `docs/research/reports/`. What remains in this repo:
 
-Real-data `make features` + coverage pass done (2026-07-15): reports
-committed under `docs/research/reports/` — 515,731 median snapshots,
-97% with an ARQ filing, fresh-within-365d 95.7%, worst field-level null
-rate 8% (`workingcapital`, the classified-balance-sheet REIT story from
-§F10); staleness×labels gradient monotone, consistent with ADR 0006.
-Nothing in the pass contradicts the registry or the staleness policy.
+- the **verification writeups** V1–V6 below (V7 done) — do these before
+  trusting the data for real decisions;
+- the remaining **open questions** below (microcap floor, snapshot
+  frequency, min/max labels, regime features);
+- maintenance: refresh ingests, rebuild, bump the dataset version.
 
-Still open in M4: **V5** (bank/insurer separation half).
-
-M5 split tagging shipped (2026-07-15): `src/splits/` tags per-horizon
-purged + embargoed roles for the sealed `holdout` and expanding
-`walkforward` schemes (calendar-year folds, median-only test rows, tags
-never filters) → `splits.parquet` + frozen fold manifest
-`split_folds.parquet`. Design: `docs/decisions/0011`; canonical
-definitions: `docs/splits.md`. Run `make splits` after the first
-real-data build and sanity-check the logged fold calendar.
-
-Split-methodology debate resolved 2026-07-17 (ADR 0010, PLAN §7.7):
-the empirical questions became `sharadar-qa splits-diag` (implemented,
-fixture-tested; workspace `docs/research/splits.md`), and the tagging
-emits the diagnostic-only `entity_holdout` / `random_kfold` schemes
-(mechanics in ADR 0011 §7) for the leakage-gap experiment registered as a
-`value-ml-models` task. Still pending: run `splits-diag` on real data
-after `make features` and record findings in the workspace.
-
-M5 assembly shipped (2026-07-18): `src/assemble/` (`sharadar-assemble`,
-`make dataset`) joins families × labels on the snapshot key
-(registry-validated), computes registry-driven ranks/sector-ranks
-(ADR 0008), the assembly-stage composites `mohanram_g7` +
-`conservative_score` (ADR 0013 — four new quality-family component
-features), and per-horizon uniqueness weights `sample_weight_{H}y`
-(ADR 0012, resolving the open question below), then writes the immutable
-`data/datasets/dataset_v1.0/` (dataset + split files + manifest).
-Canonical doc: `docs/dataset.md`; from an existing ingest, `make all` is
-the one-command end-to-end build. Remaining for the M5 exit: run the
-real-data build (`make all`), sanity-check the logged fold calendar and
-effective-sample-size sums, re-run `make qa` (including the pending
-`splits-diag` real-data pass), and publish the QA report.
+Model training moves downstream to `value-ml-models`, guided by the
+dataset user manual **[docs/manual.md](docs/manual.md)** — the registered
+experiments (leakage-gap, ADR 0010; restated-variant ablation, ADR 0009;
+era-identifiability probe) live on its task list, not here.
 
 ## Verification tasks (do these before trusting anything)
 
@@ -147,11 +118,12 @@ Each produces a short writeup in `docs/decisions/`.
       seal stays the arbiter; `entity_holdout`/`random_kfold` tagged as
       diagnostic-only schemes; the open empirical questions became the
       `sharadar-qa splits-diag` report + a registered leakage-gap experiment
-      in `value-ml-models`** → `docs/decisions/0010` *(accepted; workspace
-      `docs/research/splits.md` — real-data run still pending)*.
+      in `value-ml-models`** → `docs/decisions/0010` *(accepted; real-data
+      diagnostics run 2026-07-18, findings in `docs/research/splits.md`)*.
 - [x] Uniqueness-weight definition details: **exact day-granularity average
       uniqueness per (permaticker, horizon), computed as a boundary-integral
       difference; the three low/median/high snapshots share one pool; NULL
       where the label is unobservable; unnormalized**
-      → `docs/decisions/0012` *(accepted; `splits-diag`'s real-data label
-      decomposition and twin test remain the empirical cross-check)*.
+      → `docs/decisions/0012` *(accepted; cross-checked by the 2026-07-18
+      `splits-diag` run — serial-overlap and twin-test findings in
+      `docs/research/splits.md`)*.
