@@ -162,7 +162,11 @@ composite is deferred (ADR 0003) — its components are all above.
 | `piotroski_f` | T1 | count of the 9 signals (research §F2.2 table) | composite, 0–9; signals from components above + `ncfcommon ≤ 0` |
 | `noa_to_assets` | T1 | `((assets_q − cashneq_q − investments_q) − (liabilities_q − debt_q)) / assets_q₋₁` | Hirshleifer NOA |
 | `ext_financing_to_assets` | T0 | `(ncfcommon + ncfdebt) / assets_q` | Bradshaw–Richardson–Sloan |
-| `mohanram_g7` | T3 | 7-signal variant vs. `famaindustry` medians (§F2.2) | **assembly-stage** (needs cross-section); advertising signal unavailable |
+| `rnd_to_assets` | T0 | `coalesce(rnd, 0) / assets_q` | G-score input; unreported R&D counts as 0 — the one explicit fill (ADR 0013) |
+| `capex_to_assets` | T0 | `−capex / assets_q` | G-score input; cash-flow sign convention |
+| `roa_variability_3y` | T3 | stddev of `{roa, roa₋₁, roa₋₂, roa₋₃}` | G-score input; NULL unless all four exist |
+| `revenue_growth_variability_3y` | T3 | stddev of the 3 YoY revenue growths | G-score input; NULL unless all three exist |
+| `mohanram_g7` | T3 | 7-signal variant vs. `famaindustry` medians (ADR 0013) | **assembly-stage** (needs cross-section); advertising signal unavailable |
 
 ## Technical (from `SEP.closeadj`; differs across snapshot kinds)
 
@@ -202,8 +206,9 @@ diff once two ingest vintages exist.
 
 `base` (as-of + lag resolution) and `market` (marketcap/EV) → `valuation` →
 `profitability` + `growth` → `solvency` → `quality` → `technical` →
-`classification`; then assembly (M5) computes ranks/sector-ranks and the
-two assembly-stage columns (`mohanram_g7`, `conservative_score`).
+`classification`; then assembly (M5, `src/assemble/`) computes
+ranks/sector-ranks and the two assembly-stage columns (`mohanram_g7`,
+`conservative_score`, ADR 0013) — output layout in dataset.md.
 Market-regime features remain deferred behind their ablation gate
 (PLAN §5.6). Each family writes `data/interim/features/{family}.parquet` on
 the shared key; families never read each other's outputs.

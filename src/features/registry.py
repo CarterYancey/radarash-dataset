@@ -135,6 +135,10 @@ FEATURES: tuple[FeatureSpec, ...] = (
     _f("piotroski_f", "quality", "T1", "numeric", "count of the 9 F-score signals"),
     _f("noa_to_assets", "quality", "T1", "numeric", "net operating assets / assets_q[-1]"),
     _f("ext_financing_to_assets", "quality", "T0", "numeric", "(ncfcommon + ncfdebt) / assets_q"),
+    _f("rnd_to_assets", "quality", "T0", "numeric", "coalesce(rnd, 0) / assets_q (unreported R&D = 0, ADR 0013)"),
+    _f("capex_to_assets", "quality", "T0", "numeric", "-capex / assets_q"),
+    _f("roa_variability_3y", "quality", "T3", "numeric", "stddev of {roa, roa[-1], roa[-2], roa[-3]}"),
+    _f("revenue_growth_variability_3y", "quality", "T3", "numeric", "stddev of the 3 YoY revenue growths"),
     _f("mohanram_g7", "quality", "T3", "numeric", "7-signal G-score vs. famaindustry medians", assembly_stage=True),
     # ---- technical (from SEP; differs across snapshot kinds) ----------------
     _f("mom_12_2", "technical", "P12", "numeric", "total return t-252 -> t-21"),

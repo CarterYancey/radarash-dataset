@@ -1,6 +1,6 @@
 # V7 — DAILY point-in-time safety
 
-Generated 2026-07-15 by `sharadar-qa daily-pit` on a deterministic ticker sample. Caveats: no single diagnostic is conclusive — bulk refreshes bump `lastupdated` without changing values (#1), and shares split-adjusted between filing and price date add benign noise to the replication (#2); #3 is the sharp test.
+Generated 2026-07-18 by `sharadar-qa daily-pit` on a deterministic ticker sample. Caveats: no single diagnostic is conclusive — bulk refreshes bump `lastupdated` without changing values (#1), and shares split-adjusted between filing and price date add benign noise to the replication (#2); #3 is the sharp test.
 
 **Verdict input:** Across 428,323 restated ticker-days, DAILY.pb is closer to the **as-reported** book value 85.9% of the time. Near 100% ⇒ historical rows look frozen (PIT-safe, DAILY usable for M4 valuation); near 0% ⇒ recomputed from restated data — use the self-built SEP × ARQ construction (features.md §F8.1).
 

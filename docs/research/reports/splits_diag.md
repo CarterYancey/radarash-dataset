@@ -1,6 +1,6 @@
 # Splits diagnostics (PLAN §7.7, decision 0010)
 
-Generated 2026-07-17 by `sharadar-qa splits-diag`. Full tables land as CSVs next to this report; interpretation guide in docs/research/splits.md.
+Generated 2026-07-18 by `sharadar-qa splits-diag`. Full tables land as CSVs next to this report; interpretation guide in docs/research/splits.md.
 
 ## Q1/Q2 — which features move within a quarter
 
@@ -31,13 +31,13 @@ Top features by the fraction of (stock, quarter) groups whose three snapshot kin
 | technical | dollar_volume_3m | 515731 | 0.9612 | 0.2352 |
 | valuation | sales_yield | 462314 | 0.9491 | 0.3029 |
 | valuation | net_payout_yield | 458404 | 0.9046 | 0.4018 |
+| quality | revenue_growth_variability_3y | 317599 | 0.75 | 0.2763 |
+| quality | roa_variability_3y | 333327 | 0.7491 | 0.1802 |
 | growth | revenue_growth_3y | 324094 | 0.745 | 0.174 |
 | quality | noa_to_assets | 454606 | 0.7428 | 0.0714 |
 | growth | asset_growth_1y | 454638 | 0.7427 | 0.4267 |
 | profitability | roe | 425068 | 0.7419 | 0.1763 |
 | quality | sgai | 384125 | 0.7419 | 0.045 |
-| growth | roa_delta_1y | 415706 | 0.7415 | 0.5533 |
-| profitability | net_margin | 439829 | 0.7407 | 0.1536 |
 
 | stock_quarters | straddled_quarters | frac_straddled |
 |---|---|---|

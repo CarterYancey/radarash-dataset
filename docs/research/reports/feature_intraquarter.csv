@@ -22,6 +22,8 @@ technical,dist_52w_high,515731,0.9821,0.9565
 technical,dollar_volume_3m,515731,0.9612,0.2352
 valuation,sales_yield,462314,0.9491,0.3029
 valuation,net_payout_yield,458404,0.9046,0.4018
+quality,revenue_growth_variability_3y,317599,0.75,0.2763
+quality,roa_variability_3y,333327,0.7491,0.1802
 growth,revenue_growth_3y,324094,0.745,0.174
 quality,noa_to_assets,454606,0.7428,0.0714
 growth,asset_growth_1y,454638,0.7427,0.4267
@@ -62,6 +64,7 @@ solvency,altman_z_dd,410732,0.7303,0.1103
 quality,ext_financing_to_assets,459485,0.723,0.383
 growth,asset_turnover_delta_1y,415855,0.7216,0.5869
 growth,gross_margin_delta_2y,355846,0.7129,0.3478
+quality,capex_to_assets,459916,0.7101,0.1371
 profitability,gp_to_assets,462896,0.7097,0.0553
 profitability,asset_turnover,462905,0.7094,0.046
 growth,gross_margin_delta_1y,394872,0.7063,0.508
@@ -72,6 +75,7 @@ solvency,ni_change_scaled,415917,0.653,0.5193
 solvency,debt_to_equity,457055,0.63,0.0956
 quality,piotroski_f,361158,0.4415,0.25
 valuation,dividend_yield,458454,0.3316,0.21
+quality,rnd_to_assets,500340,0.3032,0.0799
 solvency,two_year_loss,439343,0.0355,1.0
 meta,negative_ebitda,458934,0.0346,1.0
 meta,negative_equity,500388,0.0165,1.0

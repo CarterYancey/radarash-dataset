@@ -1,5 +1,5 @@
 """Earnings-quality family: Beneish M inputs/composite, Piotroski F,
-accruals, NOA, external financing.
+accruals, NOA, external financing, Mohanram G per-firm inputs (ADR 0013).
 
 Beneish indices are ART pairs lagged one fiscal year (research §F2.2).
 `piotroski_f` counts the 9 signals from the shared components; signal 5
@@ -15,6 +15,14 @@ from __future__ import annotations
 import duckdb
 
 from .sqlutil import safe_div
+
+
+def _stddev_all_or_null(exprs: tuple[str, ...]) -> str:
+    """Sample stddev of the expressions, NULL unless every one is non-NULL
+    (the ADR 0013 variability rule — no variance over a partial history)."""
+    guard = " AND ".join(f"({e}) IS NOT NULL" for e in exprs)
+    values = ", ".join(f"({e})" for e in exprs)
+    return f"CASE WHEN {guard} THEN list_aggregate([{values}], 'stddev_samp') END"
 
 
 def build_quality_view(con: duckdb.DuckDBPyConnection) -> None:
@@ -50,6 +58,17 @@ def build_quality_view(con: duckdb.DuckDBPyConnection) -> None:
 
     roa = safe_div("b.f_netinc", "b.l_assets")
     roa_l1 = safe_div("b.f1_netinc", "b.l1_assets")
+    roa_var = _stddev_all_or_null((
+        roa,
+        roa_l1,
+        safe_div("b.f2_netinc", "b.l2_assets"),
+        safe_div("b.f3_netinc", "b.l3_assets"),
+    ))
+    growth_var = _stddev_all_or_null((
+        f"{safe_div('b.f_revenue', 'b.f1_revenue')} - 1",
+        f"{safe_div('b.f1_revenue', 'b.f2_revenue')} - 1",
+        f"{safe_div('b.f2_revenue', 'b.f3_revenue')} - 1",
+    ))
     at = safe_div("b.f_revenue", "b.l_assets")
     at_l1 = safe_div("b.f1_revenue", "b.l1_assets")
     f_signals = " + ".join(
@@ -89,7 +108,12 @@ def build_quality_view(con: duckdb.DuckDBPyConnection) -> None:
                          ' - (b.l_liabilities - b.l_debt)', 'b.l1_assets')}
                    AS noa_to_assets,
                {safe_div('b.f_ncfcommon + b.f_ncfdebt', 'b.l_assets')}
-                   AS ext_financing_to_assets
+                   AS ext_financing_to_assets,
+               {safe_div('coalesce(b.f_rnd, 0)', 'b.l_assets')}
+                   AS rnd_to_assets,
+               {safe_div('-b.f_capex', 'b.l_assets')} AS capex_to_assets,
+               {roa_var} AS roa_variability_3y,
+               {growth_var} AS revenue_growth_variability_3y
         FROM fund_base b
         """
     )

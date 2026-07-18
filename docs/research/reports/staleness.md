@@ -1,6 +1,6 @@
 # Staleness × labels report (features.md §F4.4)
 
-Generated 2026-07-15 by `sharadar-qa staleness` over median-kind snapshots; label stats use the 1y horizon and skip unobservable windows. Per-year bucket shares: `staleness_by_year.csv`.
+Generated 2026-07-18 by `sharadar-qa staleness` over median-kind snapshots; label stats use the 1y horizon and skip unobservable windows. Per-year bucket shares: `staleness_by_year.csv`.
 
 | staleness_bucket | snapshots | share | labeled_1y | mean_fwd_1y_cagr | median_fwd_1y_cagr | frac_1y_ge_0 | frac_1y_beat_spy | frac_delisted_1y |
 |---|---|---|---|---|---|---|---|---|

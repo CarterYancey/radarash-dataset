@@ -59,10 +59,19 @@ emits the diagnostic-only `entity_holdout` / `random_kfold` schemes
 `value-ml-models` task. Still pending: run `splits-diag` on real data
 after `make features` and record findings in the workspace.
 
-Remaining in M5: assembly (families × labels × splits join,
-registry-driven ranks/sector-ranks per ADR 0008, `mohanram_g7` and
-`conservative_score`, uniqueness weights — the `sample_weight` open
-question below), and `dataset_v1.0` end-to-end by one command.
+M5 assembly shipped (2026-07-18): `src/assemble/` (`sharadar-assemble`,
+`make dataset`) joins families × labels on the snapshot key
+(registry-validated), computes registry-driven ranks/sector-ranks
+(ADR 0008), the assembly-stage composites `mohanram_g7` +
+`conservative_score` (ADR 0013 — four new quality-family component
+features), and per-horizon uniqueness weights `sample_weight_{H}y`
+(ADR 0012, resolving the open question below), then writes the immutable
+`data/datasets/dataset_v1.0/` (dataset + split files + manifest).
+Canonical doc: `docs/dataset.md`; from an existing ingest, `make all` is
+the one-command end-to-end build. Remaining for the M5 exit: run the
+real-data build (`make all`), sanity-check the logged fold calendar and
+effective-sample-size sums, re-run `make qa` (including the pending
+`splits-diag` real-data pass), and publish the QA report.
 
 ## Verification tasks (do these before trusting anything)
 
@@ -140,8 +149,9 @@ Each produces a short writeup in `docs/decisions/`.
       `sharadar-qa splits-diag` report + a registered leakage-gap experiment
       in `value-ml-models`** → `docs/decisions/0010` *(accepted; workspace
       `docs/research/splits.md` — real-data run still pending)*.
-- [ ] Uniqueness-weight definition details: exact overlap counting for the
-      `sample_weight` column (de Prado ch. 4), and whether the three
-      low/median/high snapshots share a weight pool with each other.
-      (`splits-diag`'s label decomposition and twin test are direct inputs
-      to this.)
+- [x] Uniqueness-weight definition details: **exact day-granularity average
+      uniqueness per (permaticker, horizon), computed as a boundary-integral
+      difference; the three low/median/high snapshots share one pool; NULL
+      where the label is unobservable; unnormalized**
+      → `docs/decisions/0012` *(accepted; `splits-diag`'s real-data label
+      decomposition and twin test remain the empirical cross-check)*.
