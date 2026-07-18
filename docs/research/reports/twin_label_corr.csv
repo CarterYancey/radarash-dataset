@@ -1,0 +1,9 @@
+horizon,pairing,labeled_pairs,label_corr,mean_abs_diff
+1y,nearest,939,0.4034,0.4599
+1y,random,924,-0.0105,0.6803
+2y,nearest,888,0.7281,0.2283
+2y,random,852,0.0142,0.4462
+3y,nearest,841,0.5941,0.1723
+3y,random,794,-0.0051,0.3701
+5y,nearest,758,0.5919,0.1272
+5y,random,677,0.0131,0.2858

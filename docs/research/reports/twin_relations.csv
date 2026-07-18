@@ -1,0 +1,5 @@
+nn_relation,pairs,share,mean_dist2
+same_stock_within_1y,545,0.545,0.025
+unrelated,398,0.398,0.0509
+same_stock_distant,41,0.041,0.0428
+same_quarter_peer,16,0.016,0.0318
