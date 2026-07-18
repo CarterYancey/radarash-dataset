@@ -1,0 +1,164 @@
+"""Versioned dataset directory writer: parquet + splits + manifest.
+
+`data/datasets/dataset_vX.Y/` is immutable once written (README): the
+writer refuses to touch an existing directory unless forced. Column layout
+(canonical doc: docs/dataset.md): snapshot key + entry metadata, features
+in registry order (assembly-stage composites in place), rank columns,
+sector-rank columns, the label matrix, then `sample_weight_{H}y` — with
+weights NULLed wherever the horizon's label is unobservable (decision
+0012 §4).
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+import shutil
+from datetime import datetime, timezone
+from pathlib import Path
+
+import duckdb
+
+from features.registry import FEATURES
+from identity.source import sql_quote
+
+from .source import key_meta_columns, label_matrix_columns
+from .wide import (
+    feature_columns_in_order,
+    rank_columns,
+    secrank_columns,
+)
+
+logger = logging.getLogger(__name__)
+
+
+def dataset_columns(
+    con: duckdb.DuckDBPyConnection, horizons: tuple[int, ...]
+) -> dict[str, tuple[str, ...]]:
+    """The final column layout, grouped in output order."""
+    return {
+        "key_meta": key_meta_columns(con),
+        "features": feature_columns_in_order(),
+        "ranks": rank_columns(),
+        "sector_ranks": secrank_columns(),
+        "labels": label_matrix_columns(con),
+        "sample_weights": tuple(f"sample_weight_{h}y" for h in horizons),
+    }
+
+
+def build_dataset_view(
+    con: duckdb.DuckDBPyConnection, *, horizons: tuple[int, ...]
+) -> None:
+    """Create `dataset_wide`: wide_features ⋈ weights, final column order."""
+    groups = dataset_columns(con, horizons)
+    select = [f"f.{c}" for c in groups["key_meta"]]
+    select += [
+        f"f.{c}"
+        for c in groups["features"] + groups["ranks"] + groups["sector_ranks"]
+    ]
+    select += [f"f.{c}" for c in groups["labels"]]
+    select += [
+        f"CASE WHEN f.delisted_in_window_{h}y IS NOT NULL "
+        f"THEN w.sample_weight_{h}y END AS sample_weight_{h}y"
+        for h in horizons
+    ]
+    con.execute(
+        f"""
+        CREATE OR REPLACE TEMP VIEW dataset_wide AS
+        SELECT {", ".join(select)}
+        FROM wide_features f
+        JOIN sample_weights_wide w
+          USING (permaticker, snapshot_date, snapshot_kind)
+        """
+    )
+
+
+def write_dataset(
+    con: duckdb.DuckDBPyConnection,
+    *,
+    datasets_dir: Path,
+    version: str,
+    horizons: tuple[int, ...],
+    splits_parquet: Path,
+    folds_parquet: Path,
+    inputs: dict[str, Path],
+    params: dict[str, int],
+    force: bool = False,
+) -> Path:
+    """Write data/datasets/dataset_v{version}/; return the directory."""
+    out_dir = datasets_dir / f"dataset_v{version}"
+    if out_dir.exists():
+        if not force:
+            raise FileExistsError(
+                f"{out_dir} already exists — dataset versions are immutable; "
+                f"bump --dataset-version or pass --force to rebuild it"
+            )
+        shutil.rmtree(out_dir)
+    out_dir.mkdir(parents=True)
+
+    dataset_path = out_dir / "dataset.parquet"
+    rows = con.execute(
+        f"""
+        COPY (
+            SELECT * FROM dataset_wide
+            ORDER BY permaticker, snapshot_date, snapshot_kind
+        )
+        TO {sql_quote(str(dataset_path))} (FORMAT PARQUET, COMPRESSION ZSTD)
+        """
+    ).fetchone()[0]
+    for src in (splits_parquet, folds_parquet):
+        shutil.copy2(src, out_dir / src.name)
+
+    permatickers = con.execute(
+        "SELECT count(DISTINCT permaticker) FROM dataset_wide"
+    ).fetchone()[0]
+    # PLAN §7.2: summed uniqueness weights = honest effective sample size.
+    effective = {
+        f"{h}y": con.execute(
+            f"SELECT round(sum(sample_weight_{h}y), 2) FROM dataset_wide"
+        ).fetchone()[0]
+        for h in horizons
+    }
+    input_rows = {
+        name: int(
+            con.execute(
+                f"SELECT count(*) FROM read_parquet({sql_quote(str(path))})"
+            ).fetchone()[0]
+        )
+        for name, path in inputs.items()
+    }
+
+    groups = dataset_columns(con, horizons)
+    manifest = {
+        "dataset_version": version,
+        "created_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "horizons_years": list(horizons),
+        "params": params,
+        "rows": int(rows),
+        "permatickers": int(permatickers),
+        "effective_rows": effective,
+        "columns": {group: list(cols) for group, cols in groups.items()},
+        "feature_versions": {
+            spec.name: {
+                "added": spec.added_in_version,
+                "removed": spec.removed_in_version,
+            }
+            for spec in FEATURES
+        },
+        "input_rows": input_rows,
+    }
+    (out_dir / "manifest.json").write_text(
+        json.dumps(manifest, indent=2) + "\n"
+    )
+
+    n_cols = sum(len(cols) for cols in groups.values())
+    logger.info(
+        "dataset_v%s: %d rows × %d columns across %d permatickers -> %s",
+        version, rows, n_cols, permatickers, out_dir,
+    )
+    for h in horizons:
+        logger.info(
+            "dataset_v%s: %sy effective sample size (Σ sample_weight) = %s",
+            version, h, effective[f"{h}y"],
+        )
+    return out_dir

@@ -54,19 +54,20 @@ sharadar-dataset/
 ├── data/
 │   ├── raw/          # bulk parquet exports from Data Link, immutable
 │   ├── interim/      # permaticker-resolved, cleaned tables
-│   └── datasets/     # versioned final datasets: dataset_vX.Y.parquet
+│   └── datasets/     # versioned, immutable datasets: dataset_vX.Y/
 ├── src/
 │   ├── ingest/       # bulk download + refresh from Nasdaq Data Link
 │   ├── identity/     # ticker↔permaticker resolution, universe construction
-│   ├── snapshots/    # snapshot generation, as-of joins
+│   ├── labels/       # snapshot generation, forward-return + delisting-aware labels
 │   ├── features/     # feature computation (one module per feature family)
-│   ├── labels/       # forward-return + delisting-aware label computation
 │   ├── splits/       # purged/embargoed split tagging
+│   ├── assemble/     # dataset assembly: join, ranks, composites, weights
 │   └── qa/           # data-quality reports, survivorship audits
 ├── docs/
 │   ├── features.md   # canonical feature registry
 │   ├── labels.md     # canonical label definitions & conventions
 │   ├── splits.md     # canonical split-tag definitions
+│   ├── dataset.md    # canonical dataset column groups & manifest
 │   ├── decisions/    # ADR-style records of resolved design questions
 │   └── research/     # research workspaces (feature-set research, etc.)
 └── tests/
@@ -80,7 +81,7 @@ sharadar-dataset/
 | M2 — Point-in-time verified | not started |
 | M3 — Labels | ✅ code done (verification writeups pending) |
 | M4 — Features | ✅ code done (ranks + assembly-stage composites land at M5; V5 pending) |
-| M5 — Splits & assembly | 🚧 split tagging done; assembly + `dataset_v1.0` pending |
+| M5 — Splits & assembly | ✅ code done (real-data `dataset_v1.0` build + QA report pending) |
 
 The task register, verification tasks, and open questions live in
 **[TODO.md](TODO.md)**.
@@ -161,7 +162,22 @@ and expanding walk-forward folds, plus the diagnostic-only
 frozen fold manifest). Tags, never filters: no row is dropped.
 Definitions: `docs/splits.md`.
 
-### 6. Run the QA reports (feature-research inputs)
+### 6. Assemble the versioned dataset
+
+```bash
+make dataset         # or: uv run sharadar-assemble --help
+```
+
+Joins the families × labels on the snapshot key (validated against the
+registry), computes the registry-driven ranks/sector-ranks (ADR 0008), the
+assembly-stage composites `mohanram_g7` and `conservative_score` (ADR
+0013), and the per-horizon uniqueness weights `sample_weight_{H}y` (ADR
+0012), then writes the immutable `data/datasets/dataset_v1.0/` —
+`dataset.parquet` + the split files + `manifest.json`. Column groups:
+`docs/dataset.md`. From an existing ingest, `make all` runs steps 2–6
+end-to-end.
+
+### 7. Run the QA reports (feature-research inputs)
 
 ```bash
 make qa              # or: uv run sharadar-qa {coverage,staleness,daily-pit} --help
@@ -191,5 +207,6 @@ duckdb.sql("SELECT count(*) FROM 'data/interim/labels.parquet'")
 | [CLAUDE.md](CLAUDE.md) | Orientation for AI agents & developers: conventions, invariants, what to read |
 | [docs/labels.md](docs/labels.md) | Canonical label/snapshot column definitions |
 | [docs/splits.md](docs/splits.md) | Canonical split-tag definitions (roles, fold calendar) |
+| [docs/dataset.md](docs/dataset.md) | Canonical dataset column groups, weights, manifest |
 | [docs/decisions/](docs/decisions/) | ADRs for resolved design questions |
 | [docs/research/](docs/research/) | Research workspaces (feature-set research pre-M4) |

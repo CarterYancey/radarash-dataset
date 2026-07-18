@@ -88,6 +88,7 @@ ACME_FY2015_FLOWS = {
     "revenue": 600, "gp": 270, "sgna": 110, "depamor": 33, "ebit": 90,
     "ebitda": 123, "intexp": 9, "netinc": 60, "ncfo": 90, "fcf": 50,
     "ncfcommon": 4, "ncfdebt": -10, "ncfdiv": -10, "epsdil": 0.55,
+    "rnd": 12, "capex": -25,
 }
 NEG_FY2015_LEVELS = {
     "assets": 500, "assetsc": 100, "cashneq": 200, "ppnenet": 100,
@@ -397,6 +398,23 @@ def test_acme_quality(features_world):
         (dsri, gmi, aqi, sgi, depi, sgai, lvgi, tata, beneish, 7,
          0.62, -0.005)
     )
+
+    # ADR 0013 G-score inputs: rnd/capex are T0 intensities; the FY2014
+    # filing reports neither, so unreported R&D counts as 0 while capex
+    # stays NULL. Variabilities need four annual filings - ACME has two.
+    assert acme(
+        features_world,
+        "quality",
+        "rnd_to_assets, capex_to_assets, roa_variability_3y, "
+        "revenue_growth_variability_3y",
+        "2016-04-01",
+    ) == (pytest.approx(12 / 1200), pytest.approx(25 / 1200), None, None)
+    assert acme(
+        features_world,
+        "quality",
+        "rnd_to_assets, capex_to_assets",
+        "2016-01-01",
+    ) == (0.0, None)
 
 
 def neg_row(features_world, family: str, columns: str):

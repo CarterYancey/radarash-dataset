@@ -16,6 +16,7 @@ sharadar-identity = "identity.cli:main"
 sharadar-labels = "labels.cli:main"
 sharadar-features = "features.cli:main"
 sharadar-splits = "splits.cli:main"
+sharadar-assemble = "assemble.cli:main"
 sharadar-qa = "qa.cli:main"
 
 [dependency-groups]
@@ -30,7 +31,7 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 # Packages live directly under src/ (src/ingest, src/identity, ...) per the
 # architecture in README.md. Add new top-level packages here as they appear.
-packages = ["src/ingest", "src/identity", "src/labels", "src/features", "src/splits", "src/qa"]
+packages = ["src/ingest", "src/identity", "src/labels", "src/features", "src/splits", "src/assemble", "src/qa"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

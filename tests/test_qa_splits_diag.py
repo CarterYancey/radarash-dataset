@@ -64,6 +64,7 @@ SPIKE_FLOWS = {
     "revenue": 1000, "gp": 400, "sgna": 200, "depamor": 50, "ebit": 150,
     "ebitda": 200, "intexp": 10, "netinc": 100, "ncfo": 150, "fcf": 90,
     "ncfcommon": 0, "ncfdebt": 0, "ncfdiv": -5, "epsdil": 1.0,
+    "rnd": 30, "capex": -60,
 }
 FLAT_LEVELS = {
     "assets": 500, "assetsc": 200, "cashneq": 50, "receivables": 40,
@@ -76,6 +77,7 @@ FLAT_FLOWS = {
     "revenue": 200, "gp": 80, "sgna": 40, "depamor": 10, "ebit": 30,
     "ebitda": 40, "intexp": 2, "netinc": 10, "ncfo": 20, "fcf": 15,
     "ncfcommon": 0, "ncfdebt": 0, "ncfdiv": -1, "epsdil": 0.1,
+    "rnd": 5, "capex": -12,
 }
 
 QUARTER_ENDS = ((3, 31), (6, 30), (9, 30), (12, 31))

@@ -53,6 +53,7 @@ ARQ_LEVEL_FIELDS: tuple[str, ...] = (
 ART_FLOW_FIELDS: tuple[str, ...] = (
     "revenue", "gp", "sgna", "depamor", "ebit", "ebitda", "intexp",
     "netinc", "ncfo", "fcf", "ncfcommon", "ncfdebt", "ncfdiv", "epsdil",
+    "rnd", "capex",
 )
 
 

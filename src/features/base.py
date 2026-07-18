@@ -34,11 +34,13 @@ LAG_WINDOW_SLACK_DAYS = 30
 LAG_LEVEL_FIELDS: dict[int, tuple[str, ...]] = {
     1: ("assets", "assetsc", "liabilitiesc", "receivables", "ppnenet",
         "debt", "debtnc", "sharesbas", "sharefactor"),
+    2: ("assets",),
+    3: ("assets",),
 }
 LAG_FLOW_FIELDS: dict[int, tuple[str, ...]] = {
     1: ("revenue", "gp", "netinc", "epsdil", "depamor", "sgna"),
-    2: ("revenue", "gp"),
-    3: ("revenue",),
+    2: ("revenue", "gp", "netinc"),
+    3: ("revenue", "netinc"),
 }
 
 LAG_DEPTHS: tuple[int, ...] = (1, 2, 3)
