@@ -44,6 +44,9 @@ dataset user manual **[docs/manual.md](docs/manual.md)** — the registered
 experiments (leakage-gap, ADR 0010; restated-variant ablation, ADR 0009;
 era-identifiability probe) live on its task list, not here.
 
+- [ ] **M4 — Features.** Add a meta feature tracking if a ticker was in
+      the S&P 500 at snapshot date.
+
 ## Verification tasks (do these before trusting anything)
 
 Each produces a short writeup in `docs/decisions/`.
