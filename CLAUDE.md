@@ -16,6 +16,7 @@ classification. Parquet + DuckDB only; no services, no database.
 | `docs/dataset.md` | Canonical dataset column groups, rank/weight conventions, manifest. Update it whenever the assembled output changes. |
 | `docs/features.md` | Canonical feature registry (one row per feature). Must stay 1:1 with `src/features/registry.py`; update both together. |
 | `docs/research/` | Research workspaces (feature-set research pre-M4 → `features.md` there). Findings go here, not in README/PLAN. |
+| `docs/manual.md` | Downstream user manual (`value-ml-models`): how to consume a dataset version. Update it when the consumption contract (splits roles, weights, manifest) changes. |
 | `README.md` | Human-facing overview + how to run. Keep it high-level; don't let detail accumulate there. |
 
 ## Commands
