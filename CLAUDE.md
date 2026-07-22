@@ -30,6 +30,7 @@ make labels             # snapshots + label matrix
 make features           # per-family feature tables (needs labels)
 make splits             # purged/embargoed split tags (needs labels)
 make dataset            # assemble data/datasets/dataset_v1.0/ (needs labels+features+splits)
+make inference          # label-free inference dataset at the latest prices (needs identity only)
 make all                # identity → labels → features → splits → dataset
 make qa                 # data-gated QA reports (coverage, staleness, DAILY PIT, splits diagnostics)
 ```
@@ -47,13 +48,14 @@ src/labels/      source views, snapshots, delistings, paths (stage 1), compute (
 src/features/    registry.py (1:1 with docs/features.md), base (as-of + lags), market, 8 family modules, output (registry-validated writer), cli
 src/splits/      fold calendar (folds.py), role tagging (tags.py), diagnostic schemes (diagnostics.py), cli — PLAN.md §7 + decisions 0010/0011 required reading
 src/assemble/    dataset assembly: registry-validated join (source.py), ranks+composites (wide.py, decisions 0008/0013), uniqueness weights (weights.py, decision 0012), versioned output (output.py), cli
+src/inference/   label-free inference dataset (decision 0014): latest-price snapshots (snapshots.py), reuses the features builders + assemble rank pass, output, cli
 src/qa/          data-gated QA reports (sharadar-qa): coverage/null rates (F9), staleness×labels, DAILY PIT check (V7), splits diagnostics (§7.7)
 tests/           synthetic-fixture tests; conftest.py has shared TICKERS fixtures
 ```
 
 Entry points (pyproject): `sharadar-ingest`, `sharadar-identity`,
 `sharadar-labels`, `sharadar-features`, `sharadar-splits`,
-`sharadar-assemble`, `sharadar-qa`.
+`sharadar-assemble`, `sharadar-inference`, `sharadar-qa`.
 New top-level packages must be added to
 `[tool.hatch.build.targets.wheel] packages` and get a `make` target.
 

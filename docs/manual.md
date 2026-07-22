@@ -207,3 +207,24 @@ From the committed reports under `research/reports/`:
   deliberately no liquidity floor; use `log_marketcap`,
   `dollar_volume_3m`, `amihud_12m` to build one downstream if the use case
   needs it — and report it as part of the model definition.
+
+## 9. Scoring the latest cross-section (inference dataset)
+
+To run a trained model on *today's* (or the latest ingested) stocks,
+consume a `data/datasets/inference_{as_of}/` directory (`make inference`
+upstream; ADR 0014, [dataset.md](dataset.md) §inference) instead of
+hand-building features:
+
+- `dataset.parquet` carries the same `features`/`ranks`/`sector_ranks`
+  columns as training, computed by the same code — select them from its
+  `manifest.json["columns"]` exactly as in §3. There are no labels, splits,
+  or sample weights, and `key_meta` has no `quarter_trading_days`.
+- One row per currently-tradable stock, `snapshot_kind = 'inference'`,
+  ranks pooled over the whole cross-section (one partition). Same-day
+  filings are included: the earliest actionable entry is the trading day
+  *after* `as_of`, so nothing in the row postdates what a live run would
+  know (and `fundamentals_age_days` can be 0).
+- Check `manifest.json["as_of"]` and `rows_with_stale_price` before
+  trusting a run — a stale ingest silently means a stale cross-section.
+- Never train or evaluate on an inference directory: it is survivor-only
+  by construction. Model quality claims come from `dataset_vX.Y` splits.

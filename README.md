@@ -63,6 +63,7 @@ sharadar-dataset/
 │   ├── features/     # feature computation (one module per feature family)
 │   ├── splits/       # purged/embargoed split tagging
 │   ├── assemble/     # dataset assembly: join, ranks, composites, weights
+│   ├── inference/    # label-free inference dataset at the latest prices
 │   └── qa/           # data-quality reports, survivorship audits
 ├── docs/
 │   ├── features.md   # canonical feature registry
@@ -182,7 +183,22 @@ assembly-stage composites `mohanram_g7` and `conservative_score` (ADR
 `docs/dataset.md`. From an existing ingest, `make all` runs steps 2–6
 end-to-end.
 
-### 7. Run the QA reports
+### 7. Build the inference dataset (optional)
+
+```bash
+make inference       # or: uv run sharadar-inference --help
+```
+
+For scoring with a *trained* model rather than training one: a label-free
+snapshot of every currently-tradable in-universe stock at its latest
+available price, pushed through the same feature builders and rank pass as
+training (same-day filings included — the conceptual entry is the next
+trading day, so it stays point-in-time; ADR 0014). Needs only steps 1–2.
+Writes the immutable `data/datasets/inference_{as_of}/` — `dataset.parquet`
+(features × ranks, no labels/splits/weights) + `manifest.json`. Details:
+`docs/dataset.md` §inference.
+
+### 8. Run the QA reports
 
 ```bash
 make qa              # or: uv run sharadar-qa {coverage,staleness,daily-pit,splits-diag} --help

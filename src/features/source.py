@@ -85,9 +85,14 @@ def create_feature_source_views(
     sep_parquet: Path,
     mapping_parquet: Path,
     universe_parquet: Path,
-    snapshots_parquet: Path,
+    snapshots_parquet: Path | None,
 ) -> None:
-    """Create the source temp views over the raw and interim parquet files."""
+    """Create the source temp views over the raw and interim parquet files.
+
+    `snapshots_parquet=None` skips the `snapshots` view: the inference
+    pipeline (src/inference/) builds its own snapshot view from `sep_ix`
+    instead of reading the labels module's parquet.
+    """
     con.execute(
         f"""
         CREATE OR REPLACE TEMP VIEW universe AS
@@ -102,14 +107,15 @@ def create_feature_source_views(
         FROM read_parquet({sql_quote(str(mapping_parquet))})
         """
     )
-    con.execute(
-        f"""
-        CREATE OR REPLACE TEMP VIEW snapshots AS
-        SELECT permaticker, quarter, snapshot_kind, snapshot_date,
-               entry_closeadj
-        FROM read_parquet({sql_quote(str(snapshots_parquet))})
-        """
-    )
+    if snapshots_parquet is not None:
+        con.execute(
+            f"""
+            CREATE OR REPLACE TEMP VIEW snapshots AS
+            SELECT permaticker, quarter, snapshot_kind, snapshot_date,
+                   entry_closeadj
+            FROM read_parquet({sql_quote(str(snapshots_parquet))})
+            """
+        )
 
     all_fields = tuple(dict.fromkeys(ARQ_LEVEL_FIELDS + ART_FLOW_FIELDS))
     field_list = "".join(f", f.{name}" for name in all_fields)

@@ -46,7 +46,7 @@ LAG_FLOW_FIELDS: dict[int, tuple[str, ...]] = {
 LAG_DEPTHS: tuple[int, ...] = (1, 2, 3)
 
 
-def _lag_cte(k: int) -> str:
+def _lag_cte(k: int, cutoff_op: str) -> str:
     cols = ", ".join(
         [f"f.l_{x} AS l{k}_{x}" for x in LAG_LEVEL_FIELDS.get(k, ())]
         + [f"f.f_{x} AS f{k}_{x}" for x in LAG_FLOW_FIELDS.get(k, ())]
@@ -66,7 +66,7 @@ def _lag_cte(k: int) -> str:
                 FROM t0
                 JOIN sf1_filings f
                   ON f.permaticker = t0.permaticker
-                 AND f.datekey < t0.snapshot_date
+                 AND f.datekey {cutoff_op} t0.snapshot_date
                  AND f.reportperiod
                      BETWEEN t0.fund_reportperiod - {lo}
                          AND t0.fund_reportperiod - {hi}
@@ -74,13 +74,25 @@ def _lag_cte(k: int) -> str:
         )"""
 
 
-def build_fund_base_view(con: duckdb.DuckDBPyConnection) -> None:
-    """Create the `fund_base` view from `snapshots` and `sf1_filings`."""
+def build_fund_base_view(
+    con: duckdb.DuckDBPyConnection,
+    *,
+    include_same_day_filings: bool = False,
+) -> None:
+    """Create the `fund_base` view from `snapshots` and `sf1_filings`.
+
+    Training keeps the strict cutoff (`datekey < snapshot_date`): entry
+    happens at the snapshot date's close, so a same-day filing may not yet
+    be public at entry. The inference dataset (ADR 0014) passes
+    `include_same_day_filings=True` — its conceptual entry is the *next*
+    trading day, so `datekey <= snapshot_date` is still point-in-time.
+    """
+    cutoff_op = "<=" if include_same_day_filings else "<"
     t0_cols = "".join(
         [f", f.l_{x}" for x in ARQ_LEVEL_FIELDS]
         + [f", f.f_{x}" for x in ART_FLOW_FIELDS]
     )
-    lag_ctes = ",".join(_lag_cte(k) for k in LAG_DEPTHS)
+    lag_ctes = ",".join(_lag_cte(k, cutoff_op) for k in LAG_DEPTHS)
     lag_joins = "".join(
         f"""
         LEFT JOIN lag{k}
@@ -108,7 +120,7 @@ def build_fund_base_view(con: duckdb.DuckDBPyConnection) -> None:
             FROM snapshots s
             ASOF LEFT JOIN sf1_filings_latest f
               ON s.permaticker = f.permaticker
-             AND s.snapshot_date > f.datekey
+             AND s.snapshot_date {">=" if include_same_day_filings else ">"} f.datekey
         ),{lag_ctes}
         SELECT t0.*{lag_select}
         FROM t0{lag_joins}
