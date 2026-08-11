@@ -23,7 +23,12 @@ SECTION_FAMILIES = {
     "Earnings quality": "quality",
     "Technical": "technical",
     "Classification": "classification",
+    "Index membership": "index",
 }
+
+# Families whose doc table is `column | source | notes` (no tier column):
+# every feature in them carries tier None.
+TIERLESS_FAMILIES = {"classification", "index"}
 
 
 def parse_doc_rows() -> list[dict]:
@@ -47,7 +52,7 @@ def parse_doc_rows() -> list[dict]:
         cells = [c.strip() for c in line.strip("|").split("|")]
         names = re.findall(r"`([a-z_][a-z0-9_]*)`", cells[0])
         tier = None
-        if family != "classification":
+        if family not in TIERLESS_FAMILIES:
             tier = cells[1].split()[0] if cells[1] else None
         notes = cells[-1]
         # "S" marks the sector-rank allowlist; it must not match prose that

@@ -119,6 +119,12 @@ final registry in `docs/features.md`):
    TICKERS metadata is current-state, not historical — reclassified firms get
    today's label retroactively; accepted v1 caveat with `siccode` as the
    era-stable fallback (edges spelled out in docs/features.md §Classification).
+8. **Index membership:** was the stock in the S&P 500 / Dow / Russell at the
+   snapshot date, plus membership tenure. Point-in-time from Sharadar's
+   constituent actions for the S&P 500, a checked-in change history for the
+   Dow, and a market-cap-rank *proxy* for Russell (no licence-free
+   constituent history exists) — fidelity per index and the NULL-before-
+   coverage rule are spelled out in decision 0015 / docs/features.md.
 
 **Feature representation:** every numeric feature is stored twice —
 raw value AND **cross-sectional rank (percentile) within snapshot date**

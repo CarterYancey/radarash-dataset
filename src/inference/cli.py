@@ -7,6 +7,8 @@ Inputs (produced by `sharadar-ingest` and `sharadar-identity`):
 
     data/raw/SF1.parquet                  as-reported fundamentals
     data/raw/SEP.parquet                  daily prices
+    data/raw/SP500.parquet                S&P 500 constituent actions
+                                          (optional, ADR 0015)
     data/interim/ticker_permaticker.parquet
     data/interim/universe.parquet
 
@@ -149,6 +151,7 @@ def main(argv: list[str] | None = None) -> int:
             mapping_parquet=inputs["mapping"][0],
             universe_parquet=inputs["universe"][0],
             snapshots_parquet=None,
+            sp500_parquet=raw_dir / "SP500.parquet",
         )
         as_of = resolve_as_of(con, args.as_of)
         if as_of is None:

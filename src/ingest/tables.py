@@ -108,6 +108,17 @@ TABLES: dict[str, TableSpec] = {
             sort_by=("ticker", "date"),
         ),
         TableSpec(
+            name="SP500",
+            description="S&P 500 constituent actions (added/removed/current/historical).",
+            column_types={
+                **_TICKER,
+                "date": "DATE",
+                "action": "VARCHAR",
+                "contraticker": "VARCHAR",
+            },
+            sort_by=("ticker", "date"),
+        ),
+        TableSpec(
             name="DAILY",
             description="Daily-computed metrics: marketcap, ev, pe, pb, ps.",
             column_types=_PRICE_TABLE_TYPES,
@@ -122,6 +133,7 @@ DEFAULT_TABLE_ORDER: tuple[str, ...] = (
     "TICKERS",
     "ACTIONS",
     "EVENTS",
+    "SP500",
     "SFP",
     "SF1",
     "DAILY",

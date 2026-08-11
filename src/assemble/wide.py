@@ -2,7 +2,7 @@
 
 View chain (each a pure-SQL temp view over the previous):
 
-    wide_raw       labels_src ⋈ the eight feat_{family} views (inner, on the
+    wide_raw       labels_src ⋈ the feat_{family} views (inner, on the
                    shared snapshot key)
     wide_g         + mohanram_g7 from famaindustry medians (decision 0013)
     wide_r1        + {name}_rank / {name}_secrank for every registry numeric

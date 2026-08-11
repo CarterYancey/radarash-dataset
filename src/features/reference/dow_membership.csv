@@ -1,0 +1,80 @@
+# Dow Jones Industrial Average membership spells (ADR 0015).
+#
+# One row per (ticker, membership spell). `member_to` empty = still a member.
+# Dates are calendar dates, inclusive on both ends; a spell ends the day
+# before the replacement takes effect, so a ticker's index-change day is the
+# successor's `member_from`.
+#
+# Seed: the 30 constituents as of 1999-11-01 (the composition after the
+# 1999-11-01 change that added MSFT/INTC/SBC/HD). Snapshots before
+# `coverage_start` in src/features/indexes.py get NULL `in_dow`, never false
+# — this file makes no claim about the pre-1999 index.
+#
+# Ticker changes that are *not* index changes (renames, mergers where the
+# seat carried over) appear as two contiguous spells under the two tickers:
+# ALD->HON (1999-12-01), HWP->HPQ (2002-05-06), SBC->T (2005-11-21),
+# DD->DWDP (2017-09-01), DWDP->DOW (2019-04-02), UTX->RTX (2020-04-03).
+# `T` therefore has two spells belonging to two different companies
+# (AT&T Corp until 2004, AT&T Inc. from 2005) — they resolve to different
+# permatickers through the mapping's price-coverage windows.
+#
+# VERIFIED THROUGH: 2024-11-08 (NVDA/SHW in, INTC/DOW out). Membership is
+# carried forward past that date; append new rows here when the index
+# changes and `sharadar-features` logs the staleness warning.
+ticker,member_from,member_to,note
+AA,1999-11-01,2013-09-19,seed; out 2013-09-20 (GS/NKE/V in)
+ALD,1999-11-01,1999-11-30,seed (AlliedSignal); renamed Honeywell International
+HON,1999-12-01,2008-02-18,AlliedSignal renamed; out 2008-02-19 (BAC/CVX in)
+AXP,1999-11-01,,seed
+BA,1999-11-01,,seed
+C,1999-11-01,2009-06-07,seed (Citigroup); out 2009-06-08 (CSCO/TRV in)
+CAT,1999-11-01,,seed
+DD,1999-11-01,2017-08-31,seed (DuPont); became DowDuPont
+DWDP,2017-09-01,2019-04-01,DowDuPont; replaced by Dow Inc in the index
+DOW,2019-04-02,2024-11-07,Dow Inc; out 2024-11-08 (NVDA/SHW in)
+DIS,1999-11-01,,seed
+EK,1999-11-01,2004-04-07,seed (Eastman Kodak); out 2004-04-08
+GE,1999-11-01,2018-06-25,seed; out 2018-06-26 (WBA in)
+GM,1999-11-01,2009-06-07,seed (old General Motors); out 2009-06-08
+HD,1999-11-01,,seed (added 1999-11-01)
+HWP,1999-11-01,2002-05-03,seed (Hewlett-Packard); ticker became HPQ
+HPQ,2002-05-06,2013-09-19,post-Compaq ticker; out 2013-09-20
+IBM,1999-11-01,,seed
+INTC,1999-11-01,2024-11-07,seed (added 1999-11-01); out 2024-11-08
+IP,1999-11-01,2004-04-07,seed (International Paper); out 2004-04-08
+JNJ,1999-11-01,,seed
+JPM,1999-11-01,,seed (J.P. Morgan; seat carried through the 2000 Chase merger)
+KO,1999-11-01,,seed
+MCD,1999-11-01,,seed
+MMM,1999-11-01,,seed
+MO,1999-11-01,2008-02-18,seed (Philip Morris/Altria); out 2008-02-19
+MRK,1999-11-01,,seed
+MSFT,1999-11-01,,seed (added 1999-11-01)
+PG,1999-11-01,,seed
+SBC,1999-11-01,2005-11-18,seed (SBC Communications; added 1999-11-01)
+T,1999-11-01,2004-04-07,seed (AT&T Corp); out 2004-04-08
+T,2005-11-21,2015-03-18,SBC renamed AT&T Inc.; out 2015-03-19 (AAPL in)
+UTX,1999-11-01,2020-04-02,seed (United Technologies); became Raytheon Technologies
+RTX,2020-04-03,2020-08-30,Raytheon Technologies; out 2020-08-31
+WMT,1999-11-01,,seed
+XOM,1999-11-01,2020-08-30,seed (Exxon Mobil); out 2020-08-31
+AIG,2004-04-08,2008-09-21,in 2004-04-08; out 2008-09-22 (KFT in)
+PFE,2004-04-08,2020-08-30,in 2004-04-08; out 2020-08-31
+VZ,2004-04-08,,in 2004-04-08
+BAC,2008-02-19,2013-09-19,in 2008-02-19; out 2013-09-20
+CVX,2008-02-19,,in 2008-02-19
+KFT,2008-09-22,2012-09-23,Kraft Foods; out 2012-09-24 (UNH in)
+CSCO,2009-06-08,,in 2009-06-08
+TRV,2009-06-08,,in 2009-06-08
+UNH,2012-09-24,,in 2012-09-24
+GS,2013-09-20,,in 2013-09-20
+NKE,2013-09-20,,in 2013-09-20
+V,2013-09-20,,in 2013-09-20
+AAPL,2015-03-19,,in 2015-03-19
+WBA,2018-06-26,2024-02-25,in 2018-06-26; out 2024-02-26 (AMZN in)
+AMGN,2020-08-31,,in 2020-08-31
+CRM,2020-08-31,,in 2020-08-31
+HON,2020-08-31,,re-added 2020-08-31
+AMZN,2024-02-26,,in 2024-02-26
+NVDA,2024-11-08,,in 2024-11-08
+SHW,2024-11-08,,in 2024-11-08

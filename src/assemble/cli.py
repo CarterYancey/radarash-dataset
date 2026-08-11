@@ -6,7 +6,7 @@
 Inputs (produced by `sharadar-labels`, `sharadar-features`, `sharadar-splits`):
 
     data/interim/labels.parquet             wide label matrix
-    data/interim/features/{family}.parquet  the eight family tables
+    data/interim/features/{family}.parquet  the family tables
     data/interim/splits.parquet             role tags (copied verbatim)
     data/interim/split_folds.parquet        fold manifest (copied verbatim)
 

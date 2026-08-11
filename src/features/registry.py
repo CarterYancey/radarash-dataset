@@ -25,6 +25,7 @@ FAMILIES: tuple[str, ...] = (
     "quality",
     "technical",
     "classification",
+    "index",
 )
 
 # kind: numeric features get ranks at assembly; flags/categoricals/metadata
@@ -157,6 +158,15 @@ FEATURES: tuple[FeatureSpec, ...] = (
     _f("famaindustry", "classification", None, "categorical", "Fama-French 48-style industry"),
     _f("scalemarketcap", "classification", None, "categorical", "Sharadar size bucket"),
     _f("siccode", "classification", None, "categorical", "SIC code (era-stable industry fallback)"),
+    # ---- index membership (ADR 0015; Russell columns are a proxy) ---------
+    _f("in_sp500", "index", None, "flag", "S&P 500 constituent at snapshot_date", added_in_version="1.1"),
+    _f("days_in_sp500", "index", None, "numeric", "days since the current S&P 500 spell began", added_in_version="1.1"),
+    _f("in_dow", "index", None, "flag", "Dow 30 constituent at snapshot_date", added_in_version="1.1"),
+    _f("days_in_dow", "index", None, "numeric", "days since the current Dow spell began", added_in_version="1.1"),
+    _f("in_russell1000", "index", None, "flag", "proxy: marketcap rank <= 1000 at the last reconstitution", added_in_version="1.1"),
+    _f("in_russell2000", "index", None, "flag", "proxy: marketcap rank 1001-3000 at the last reconstitution", added_in_version="1.1"),
+    _f("in_russell3000", "index", None, "flag", "proxy: marketcap rank <= 3000 at the last reconstitution", added_in_version="1.1"),
+    _f("in_major_index", "index", None, "flag", "in_sp500 OR in_dow OR in_russell3000", added_in_version="1.1"),
 )
 
 

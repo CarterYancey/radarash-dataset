@@ -15,6 +15,12 @@ Everything downstream works from these temp views:
 - `sep_ix`             — permaticker-resolved daily prices (close, closeadj,
                          volume) on the dense trading-calendar index, with
                          per-stock daily returns for the technical family.
+- `sep_common`         — unadjusted closes for *every* common stock,
+                         universe exclusions included, for the index
+                         family's market-wide Russell ranking.
+- `sp500_raw`          — the SHARADAR/SP500 constituent actions, or an empty
+                         stub when that table has not been ingested (the
+                         index family then emits NULL S&P 500 membership).
 - `trading_calendar`   — market trading calendar (distinct SEP dates).
 - `universe`, `price_mapping` — identity artifacts, verbatim.
 
@@ -86,12 +92,18 @@ def create_feature_source_views(
     mapping_parquet: Path,
     universe_parquet: Path,
     snapshots_parquet: Path | None,
+    sp500_parquet: Path | None = None,
 ) -> None:
     """Create the source temp views over the raw and interim parquet files.
 
     `snapshots_parquet=None` skips the `snapshots` view: the inference
     pipeline (src/inference/) builds its own snapshot view from `sep_ix`
     instead of reading the labels module's parquet.
+
+    `sp500_parquet=None` (or a path that does not exist) leaves `sp500_raw`
+    empty, which is the documented degradation for a dataset built before
+    the SP500 table was ingested: S&P 500 membership comes out NULL rather
+    than false (ADR 0015).
     """
     con.execute(
         f"""
@@ -226,3 +238,42 @@ def create_feature_source_views(
         WINDOW w AS (PARTITION BY m.permaticker ORDER BY c.ix)
         """
     )
+    # Market-wide common-stock closes: the index family's Russell proxy sets
+    # its breakpoints on the whole market, so this deliberately skips the
+    # `in_universe` filter that `sep_ix` applies (financials rank too).
+    con.execute(
+        f"""
+        CREATE OR REPLACE TEMP VIEW sep_common AS
+        SELECT m.permaticker, p.date, p.close
+        FROM read_parquet({sql_quote(str(sep_parquet))}) p
+        JOIN price_mapping m
+          ON p.ticker = m.ticker
+         AND p.date >= coalesce(m.firstpricedate, DATE '0001-01-01')
+         AND p.date <= coalesce(m.lastpricedate, DATE '9999-12-31')
+        JOIN universe u
+          ON u.permaticker = m.permaticker AND u.is_common_stock
+        WHERE p.close IS NOT NULL AND p.close > 0
+        """
+    )
+    if sp500_parquet is not None and Path(sp500_parquet).exists():
+        con.execute(
+            f"""
+            CREATE OR REPLACE TEMP VIEW sp500_raw AS
+            SELECT ticker, date, action
+            FROM read_parquet({sql_quote(str(sp500_parquet))})
+            """
+        )
+    else:
+        logger.warning(
+            "no SP500 constituent table at %s — S&P 500 membership features "
+            "will be NULL (run `sharadar-ingest --tables SP500`)",
+            sp500_parquet,
+        )
+        con.execute(
+            """
+            CREATE OR REPLACE TEMP VIEW sp500_raw AS
+            SELECT NULL::VARCHAR AS ticker, NULL::DATE AS date,
+                   NULL::VARCHAR AS action
+            WHERE false
+            """
+        )

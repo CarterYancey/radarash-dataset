@@ -4,7 +4,9 @@ from ingest.tables import DEFAULT_TABLE_ORDER, TABLES, resolve_tables
 
 
 def test_registry_covers_all_readme_tables():
-    assert set(TABLES) == {"SF1", "SEP", "SFP", "TICKERS", "ACTIONS", "EVENTS", "DAILY"}
+    assert set(TABLES) == {
+        "SF1", "SEP", "SFP", "TICKERS", "ACTIONS", "EVENTS", "DAILY", "SP500",
+    }
     assert set(DEFAULT_TABLE_ORDER) == set(TABLES)
 
 

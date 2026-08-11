@@ -7,6 +7,9 @@ Inputs (produced by `sharadar-ingest`, `sharadar-identity`, `sharadar-labels`):
 
     data/raw/SF1.parquet                  as-reported fundamentals
     data/raw/SEP.parquet                  daily prices
+    data/raw/SP500.parquet                S&P 500 constituent actions
+                                          (optional; absent => NULL S&P 500
+                                          membership, ADR 0015)
     data/interim/ticker_permaticker.parquet
     data/interim/universe.parquet
     data/interim/snapshots.parquet
@@ -28,6 +31,7 @@ import duckdb
 from .base import build_fund_base_view
 from .classification import build_classification_view
 from .growth import build_growth_view
+from .indexes import build_index_view
 from .market import build_market_view
 from .meta import build_meta_view
 from .output import write_family_table
@@ -50,6 +54,7 @@ FAMILY_BUILDERS = {
     "quality": build_quality_view,
     "technical": build_technical_view,
     "classification": build_classification_view,
+    "index": build_index_view,
 }
 assert tuple(FAMILY_BUILDERS) == FAMILIES
 
@@ -123,6 +128,7 @@ def main(argv: list[str] | None = None) -> int:
             mapping_parquet=interim_dir / "ticker_permaticker.parquet",
             universe_parquet=interim_dir / "universe.parquet",
             snapshots_parquet=interim_dir / "snapshots.parquet",
+            sp500_parquet=raw_dir / "SP500.parquet",
         )
         build_fund_base_view(con)
         build_market_view(con)

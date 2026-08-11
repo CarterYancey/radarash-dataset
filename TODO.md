@@ -32,6 +32,16 @@ resolved questions get an ADR in `docs/decisions/` and are checked off here.
       *(Done 2026-07-22: `src/inference/` reuses the training feature +
       rank machinery verbatim; ADR 0014, `docs/dataset.md` §inference,
       `docs/manual.md` §9.)*
+- [x] **M7 — Index-membership features.** `in_sp500` / `in_dow` /
+      `in_russell1000|2000|3000` / `in_major_index` plus the two tenure
+      columns, as the `index` family.
+      *(Done 2026-08-11: `SHARADAR/SP500` ingested for real PIT S&P 500
+      spells, Dow from the checked-in change history
+      `src/features/reference/dow_membership.csv`, Russell as a documented
+      market-cap-rank proxy; ADR 0015, `docs/features.md` §index
+      membership. Follow-up: refresh the Dow file when the index changes —
+      the build warns past its verified-through date — and swap the Russell
+      proxy for a licensed constituent file if one lands.)*
 
 ## Current state & next
 

@@ -60,6 +60,19 @@ cols = json.load(open(f"{DATASET}/manifest.json"))["columns"]
 feature_cols = cols["features"] + cols["ranks"] + cols["sector_ranks"]
 ```
 
+### Index-membership columns (ADR 0015)
+
+`in_sp500` / `days_in_sp500` are true point-in-time membership from
+Sharadar's constituent-action table. `in_dow` / `days_in_dow` come from a
+hand-maintained change history in this repo — exact, but only as current as
+its last update. The three `in_russell*` columns are a **market-cap-rank
+proxy**, not FTSE Russell's constituent list: they will disagree with the
+real index near the rank-1000 and rank-3000 boundaries and for mid-year
+additions, so don't use them as ground truth for index-inclusion studies.
+All of them are NULL — not false — for snapshots that predate their index's
+coverage start, so treat NULL as "unknown", and prefer `in_major_index`
+when you just need "is this a widely-held name".
+
 Every feature is point-in-time: it reflects only information publicly
 available on or before `snapshot_date`. Do not "enrich" rows by joining
 anything computed from raw Sharadar tables unless you replicate that

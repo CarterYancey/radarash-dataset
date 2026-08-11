@@ -43,6 +43,7 @@ All data comes from **Sharadar via Nasdaq Data Link**:
 | `TICKERS` | Metadata: permaticker, category, sector/industry, isdelisted, SIC, FF industry | Universe definition, identifier mapping |
 | `ACTIONS` / `EVENTS` | Corporate actions, delisting events | Delisting-return conventions |
 | `DAILY` | Daily-computed metrics (marketcap, ev, pe, pb, ps) | Convenience features |
+| `SP500` | S&P 500 constituent actions (added/removed) | Index-membership features |
 
 ## Architecture
 
@@ -107,7 +108,7 @@ Set your Nasdaq Data Link API key, then bulk-download everything:
 
 ```bash
 export NASDAQ_DATA_LINK_API_KEY=...
-make ingest                          # all seven tables
+make ingest                          # all eight tables
 make ingest TABLES="TICKERS SEP"     # or a subset
 ```
 
@@ -150,7 +151,7 @@ make features        # or: uv run sharadar-features --help
 
 Produces one parquet per feature family under `data/interim/features/`
 (meta, valuation, profitability, growth, solvency, quality, technical,
-classification), each keyed like `labels.parquet` and validated against the
+classification, index), each keyed like `labels.parquet` and validated against the
 canonical registry (`docs/features.md` / `src/features/registry.py`).
 Ranks, sector ranks, and the assembly-stage composites are computed at
 assembly (M5).

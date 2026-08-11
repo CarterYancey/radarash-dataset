@@ -1,7 +1,7 @@
 # Canonical dataset definitions (M5)
 
 Produced by `sharadar-assemble` (`src/assemble/`), consuming
-`data/interim/labels.parquet`, the eight family parquets under
+`data/interim/labels.parquet`, the nine family parquets under
 `data/interim/features/`, and the split artifacts. Output is one
 **versioned, immutable directory**:
 
@@ -29,6 +29,14 @@ explicitly; otherwise bump `--dataset-version`).
 | sector ranks | `{name}_secrank` for the allowlist | assembly (ADR 0008) |
 | label matrix | the per-horizon `fwd_*` / `label_*` / `delisted_in_window_*` columns | labels.parquet (docs/labels.md) |
 | weights | `sample_weight_{H}y` per horizon | assembly (ADR 0012) |
+
+### Index membership (ADR 0015)
+
+The `index` family's eight columns ride in the features group like any
+other family. Fidelity differs by index — real PIT for the S&P 500, a
+checked-in change history for the Dow, an explicit market-cap-rank proxy
+for Russell — and membership is NULL, never false, before each index's
+coverage start. Details in [features.md](features.md#index-membership).
 
 ### Ranks (ADR 0008)
 

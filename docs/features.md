@@ -6,7 +6,8 @@
 [0005](decisions/0005-feature-set-scope-v1.md) (v1 scope),
 [0006](decisions/0006-staleness-policy.md) (staleness),
 [0007](decisions/0007-market-inputs-daily-pit.md) (market inputs),
-[0008](decisions/0008-rank-representation.md) (ranks).
+[0008](decisions/0008-rank-representation.md) (ranks),
+[0015](decisions/0015-index-membership-features.md) (index membership).
 `src/features/` implements this registry in the build order below.
 Research trail: [research/features.md](research/features.md).
 
@@ -202,11 +203,45 @@ peer-group *identity* only, never through the ranked firm's own values.
 Revisit if material drift ever shows up — measurable as a cross-export
 diff once two ingest vintages exist.
 
+## Index membership
+
+Point-in-time membership of the three index families, on the snapshot date
+([ADR 0015](decisions/0015-index-membership-features.md)). The flags are
+never ranked; the two `days_in_*` tenure columns are ordinary numerics and
+get a plain `_rank` at assembly, no sector rank.
+
+Coverage is per index: **before an index's coverage start the columns are
+NULL, never false** — no history is not evidence of non-membership.
+
+| column | source | notes |
+|---|---|---|
+| `in_sp500` | SHARADAR/SP500 | flag; true PIT from the constituent-action stream. NULL everywhere if that table was never ingested |
+| `days_in_sp500` | SHARADAR/SP500 | **numeric** (ranked): days since the current membership spell began; NULL for non-members. Left-censored at the table's first date for constituents that predate it |
+| `in_dow` | `src/features/reference/dow_membership.csv` | flag; hand-maintained change history, covers 1999-11-01 onward, verified through 2024-11-08 and carried forward (the build logs a warning past that date) |
+| `days_in_dow` | same | **numeric** (ranked); NULL for non-members |
+| `in_russell1000` | **proxy** — self-computed | flag; market-cap rank ≤ 1000 among all common stocks (financials included) at the last June reconstitution |
+| `in_russell2000` | **proxy** | flag; rank 1001–3000 |
+| `in_russell3000` | **proxy** | flag; rank ≤ 3000 |
+| `in_major_index` | derived | flag; `in_sp500 OR in_dow OR in_russell3000`, NULL only when all three are NULL |
+
+The Russell columns are a reconstruction, not the index: ranking day is the
+last trading day on or before **May 31**, membership holds from the first
+trading day of **July** to the next reconstitution, market cap is the ADR
+0007 self-built `close × sharesbas × sharefactor` from the last filing
+public before the ranking day. Real reconstitutions use banded rules, float
+adjustment, and mid-year IPO additions — treat the boundary as approximate,
+and treat "no market cap on the ranking day" as `false` (outside the top
+3000), not NULL.
+
+Membership rows resolve to permatickers through the mapping's price-coverage
+window, so a reused ticker's spells land on the right company (the Dow's
+`T` covers AT&T Corp until 2004 and AT&T Inc. from 2005 — two permatickers).
+
 ## Build order (`src/features/`, research §F8.2)
 
 `base` (as-of + lag resolution) and `market` (marketcap/EV) → `valuation` →
 `profitability` + `growth` → `solvency` → `quality` → `technical` →
-`classification`; then assembly (M5, `src/assemble/`) computes
+`classification` → `index`; then assembly (M5, `src/assemble/`) computes
 ranks/sector-ranks and the two assembly-stage columns (`mohanram_g7`,
 `conservative_score`, ADR 0013) — output layout in dataset.md.
 Market-regime features remain deferred behind their ablation gate
