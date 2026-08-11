@@ -78,3 +78,38 @@ via `splits.parquet` roles (`docs/splits.md`), and must cite
 `split_folds.parquet` in reports. Assembly validates every family parquet
 against `src/features/registry.py` before joining and refuses misaligned
 inputs, so a dataset directory is internally consistent by construction.
+
+## The inference dataset (ADR 0014)
+
+Produced by `sharadar-inference` (`src/inference/`, `make inference`) from
+the ingest + identity artifacts only — no labels, features, or splits
+stages required. One snapshot per in-universe stock at its **latest
+available price**, for a trained model to score:
+
+```
+data/datasets/inference_{as_of}/
+├── dataset.parquet       one row per tradable stock: features × ranks
+└── manifest.json         provenance: as_of, params, counts, column layout
+```
+
+- `as_of` = last trading date in SEP on or before `--as-of` (default: the
+  last date in SEP). Stocks whose most recent trade is within
+  `--max-price-age-days` (default 5) trading days of `as_of` are included;
+  `snapshot_date`/`entry_closeadj` are the stock's own last print.
+- `snapshot_kind` = `'inference'` for every row; `quarter` is uniform (the
+  calendar quarter of `as_of`), so the ADR 0008 rank pass ranks the whole
+  inference cross-section as one partition. Same guards, same composites,
+  same feature code as training — including the T1–T3 lags.
+- Fundamentals as-of is **inclusive** (`datekey <= snapshot_date`): the
+  conceptual entry is the next trading day, so a same-day filing is public
+  before any actionable trade (ADR 0014; training keeps the strict rule).
+- Columns are the training layout minus everything forward-looking: key +
+  entry metadata (no `quarter_trading_days`), features, ranks, sector
+  ranks — no label matrix, no split files, no `sample_weight_{H}y`. A
+  model selects its feature/rank columns by name and scores directly.
+- The manifest mirrors the training manifest with `dataset_kind:
+  "inference"`, `as_of`, and `rows_with_stale_price` (rows whose last
+  print predates `as_of`) instead of horizons/effective rows.
+
+The inference cross-section is survivor-only by design (today's tradable
+stocks); it must never be used for training or evaluation.

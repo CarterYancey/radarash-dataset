@@ -1,7 +1,7 @@
 # Optional subset, e.g.: make ingest TABLES="TICKERS SEP"
 TABLES ?=
 
-.PHONY: ingest identity labels features splits dataset all qa test
+.PHONY: ingest identity labels features splits dataset inference all qa test
 
 ingest:
 	uv run sharadar-ingest $(if $(TABLES),--tables $(TABLES))
@@ -20,6 +20,10 @@ splits:
 
 dataset:
 	uv run sharadar-assemble
+
+# Label-free snapshot of today's stocks for a trained model to score
+inference:
+	uv run sharadar-inference
 
 # End-to-end from an existing ingest: data/raw -> data/datasets/dataset_v1.0
 all: identity labels features splits dataset

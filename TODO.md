@@ -26,6 +26,12 @@ resolved questions get an ADR in `docs/decisions/` and are checked off here.
       reports committed under `docs/research/reports/`, splits-diag findings
       recorded in `docs/research/splits.md`. Design: decisions 0010–0013;
       canonical docs `docs/splits.md` / `docs/dataset.md`.)*
+- [x] **M6 — Inference dataset.** Label-free snapshot of the latest tradable
+      cross-section for scoring with a trained model: `make inference` →
+      `data/datasets/inference_{as_of}/`.
+      *(Done 2026-07-22: `src/inference/` reuses the training feature +
+      rank machinery verbatim; ADR 0014, `docs/dataset.md` §inference,
+      `docs/manual.md` §9.)*
 
 ## Current state & next
 
