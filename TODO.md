@@ -52,6 +52,11 @@ era-identifiability probe) live on its task list, not here.
 
 - [ ] **M4 — Features.** Add a meta feature tracking if a ticker was in
       the S&P 500 at snapshot date.
+- [x] **M4 — Features.** Trend & consistency family (long-horizon financial
+      health: revenue/tangibles/OCF trends over 4/8/12/20-quarter windows,
+      10-year dividend record) → `docs/decisions/0015`; dataset version
+      1.1. *(Motivated by models surfacing stocks without a consistent
+      financial history at inference.)*
 
 ## Verification tasks (do these before trusting anything)
 

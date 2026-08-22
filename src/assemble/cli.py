@@ -38,7 +38,7 @@ from .wide import MIN_INDUSTRY_PEERS, RANK_GUARD, build_wide_views
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_VERSION = "1.0"
+DEFAULT_VERSION = "1.1"
 
 
 def build_parser() -> argparse.ArgumentParser:

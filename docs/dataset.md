@@ -1,7 +1,7 @@
 # Canonical dataset definitions (M5)
 
 Produced by `sharadar-assemble` (`src/assemble/`), consuming
-`data/interim/labels.parquet`, the eight family parquets under
+`data/interim/labels.parquet`, the nine family parquets under
 `data/interim/features/`, and the split artifacts. Output is one
 **versioned, immutable directory**:
 

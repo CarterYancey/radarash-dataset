@@ -25,7 +25,7 @@ dataset:
 inference:
 	uv run sharadar-inference
 
-# End-to-end from an existing ingest: data/raw -> data/datasets/dataset_v1.0
+# End-to-end from an existing ingest: data/raw -> data/datasets/dataset_v1.1
 all: identity labels features splits dataset
 
 qa:

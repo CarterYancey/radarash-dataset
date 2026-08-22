@@ -45,7 +45,7 @@ present.
 src/ingest/      table registry (tables.py), download, CSV→parquet conversion
 src/identity/    tickers dedup (source.py), mapping, universe, year counts
 src/labels/      source views, snapshots, delistings, paths (stage 1), compute (stage 2), cli
-src/features/    registry.py (1:1 with docs/features.md), base (as-of + lags), market, 8 family modules, output (registry-validated writer), cli
+src/features/    registry.py (1:1 with docs/features.md), base (as-of + lags), history (quarterly/annual buckets), market, 9 family modules, output (registry-validated writer), cli
 src/splits/      fold calendar (folds.py), role tagging (tags.py), diagnostic schemes (diagnostics.py), cli — PLAN.md §7 + decisions 0010/0011 required reading
 src/assemble/    dataset assembly: registry-validated join (source.py), ranks+composites (wide.py, decisions 0008/0013), uniqueness weights (weights.py, decision 0012), versioned output (output.py), cli
 src/inference/   label-free inference dataset (decision 0014): latest-price snapshots (snapshots.py), reuses the features builders + assemble rank pass, output, cli

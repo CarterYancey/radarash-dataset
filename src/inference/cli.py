@@ -33,6 +33,7 @@ from assemble.source import family_view
 from assemble.wide import MIN_INDUSTRY_PEERS, RANK_GUARD, build_wide_views
 from features.base import build_fund_base_view
 from features.cli import FAMILY_BUILDERS
+from features.history import build_fund_history_view
 from features.market import build_market_view
 from features.output import validate_family_columns, view_name
 from features.registry import FAMILIES
@@ -167,6 +168,7 @@ def main(argv: list[str] | None = None) -> int:
 
         # ADR 0014: filings dated the snapshot day itself are usable.
         build_fund_base_view(con, include_same_day_filings=True)
+        build_fund_history_view(con, include_same_day_filings=True)
         build_market_view(con)
         for family in FAMILIES:
             FAMILY_BUILDERS[family](con)

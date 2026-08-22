@@ -19,6 +19,7 @@ SECTION_FAMILIES = {
     "Valuation": "valuation",
     "Profitability": "profitability",
     "Growth & trends": "growth",
+    "Trend & consistency": "trend",
     "Solvency / distress": "solvency",
     "Earnings quality": "quality",
     "Technical": "technical",

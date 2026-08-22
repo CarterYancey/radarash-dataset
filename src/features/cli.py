@@ -28,6 +28,7 @@ import duckdb
 from .base import build_fund_base_view
 from .classification import build_classification_view
 from .growth import build_growth_view
+from .history import build_fund_history_view
 from .market import build_market_view
 from .meta import build_meta_view
 from .output import write_family_table
@@ -37,6 +38,7 @@ from .registry import FAMILIES
 from .solvency import build_solvency_view
 from .source import check_sf1_fields, create_feature_source_views
 from .technical import build_technical_view
+from .trend import build_trend_view
 from .valuation import build_valuation_view
 
 logger = logging.getLogger(__name__)
@@ -46,6 +48,7 @@ FAMILY_BUILDERS = {
     "valuation": build_valuation_view,
     "profitability": build_profitability_view,
     "growth": build_growth_view,
+    "trend": build_trend_view,
     "solvency": build_solvency_view,
     "quality": build_quality_view,
     "technical": build_technical_view,
@@ -125,6 +128,7 @@ def main(argv: list[str] | None = None) -> int:
             snapshots_parquet=interim_dir / "snapshots.parquet",
         )
         build_fund_base_view(con)
+        build_fund_history_view(con)
         build_market_view(con)
 
         features_dir = interim_dir / "features"
