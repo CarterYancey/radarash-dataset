@@ -6,7 +6,8 @@
 [0005](decisions/0005-feature-set-scope-v1.md) (v1 scope),
 [0006](decisions/0006-staleness-policy.md) (staleness),
 [0007](decisions/0007-market-inputs-daily-pit.md) (market inputs),
-[0008](decisions/0008-rank-representation.md) (ranks).
+[0008](decisions/0008-rank-representation.md) (ranks),
+[0015](decisions/0015-trend-consistency-features.md) (trend & consistency, v1.1).
 `src/features/` implements this registry in the build order below.
 Research trail: [research/features.md](research/features.md).
 
@@ -46,8 +47,15 @@ versions diffable from the registry alone.
   `{name}_secrank` within (quarter, kind, sector). Flags (bool) and
   classification columns are not ranked.
 - **Tiers** (ADR 0004): T0 current filing; T1/T2/T3 = +1/2/3 fiscal years;
-  P12/P36 = 252/756 trading days of `SEP.closeadj`. Tier = what the feature
-  *needs*; unmet ⇒ NULL.
+  P12/P36 = 252/756 trading days of `SEP.closeadj`; T5/T10 = +20 quarters /
+  +10 fiscal years (ADR 0015). Tier = what the feature *needs*; unmet ⇒
+  NULL — except the windowed trend family, whose tier states the full
+  window while partial histories degrade per its min-count rules.
+- **Quarterly/annual history windows** (ADR 0015): the lag-q (lag-y)
+  observation is the filing with `reportperiod` within ±30 days of
+  `fund_reportperiod − q·91.3125` (`− y·365.25`), latest
+  `datekey < snapshot_date` version — the quarterly/annual generalization
+  of the YoY rule above. No partner ⇒ bucket missing.
 - Structurally null segments (from the coverage report, research §F10):
   classified-balance-sheet inputs (`workingcapital`, `assetsc`,
   `liabilitiesc`) are ~84% NULL for Real Estate and ~55% for residual
@@ -116,6 +124,69 @@ textbook ROA).
 | `asset_turnover_delta_1y` | T1 | `asset_turnover − asset_turnover₋₁` | F-score signal 9 |
 | `asset_growth_1y` | T1 | `assets_q / assets_q₋₁ − 1` | Cooper–Gulen–Schill |
 | `share_count_growth_1y` | T1 | `(sharesbas·sharefactor) YoY − 1` | dilution; F-score signal 7 proxy |
+
+## Trend & consistency (ADR 0015; added in v1.1)
+
+Long-history financial health over quarterly windows w ∈ {4, 8, 12, 20}
+(~1/2/3/5y, matching the label horizons; tiers T1/T2/T3/T5 respectively).
+Series: `revenue` (ART TTM), `tangibles_q` (ARQ), `ncfo` (ART TTM).
+`trend`/`consistency` need ≥ {3, 5, 7, 11} observations, all > 0 (the log's
+domain — no silent filtering); `up_frac` needs one fewer adjacent-quarter
+pairs; `*_positive_frac` the same min counts. TTM at quarterly spacing
+overlaps by construction (smoothed, seasonality-free — a TTM increase means
+the latest quarter beat its year-ago quarter); `consistency` of a constant
+series is 1 (consistent, zero trend). Dividend features sample the TTM cash
+dividend `−ncfdiv` at fiscal-year anniversaries over 10 years; a cut is a
+YoY drop below 0.8× (omission included). No T0 filing ⇒ all NULL; no known
+dividend year ⇒ the dividend counters are NULL.
+
+| column | tier | definition | notes |
+|---|---|---|---|
+| `revenue_trend_4q` | T1 | `regr_slope(ln(revenue), years)`, last 4 quarterly obs | annualized log growth |
+| `revenue_consistency_4q` | T1 | `regr_r2` of the 4q revenue fit | 1 = textbook compounder |
+| `revenue_up_frac_4q` | T1 | share of adjacent-quarter revenue increases, 4q | |
+| `revenue_trend_8q` | T2 | same fit over 8 quarters | |
+| `revenue_consistency_8q` | T2 | `regr_r2`, 8q | |
+| `revenue_up_frac_8q` | T2 | share of increases, 8q | |
+| `revenue_trend_12q` | T3 | same fit over 12 quarters | |
+| `revenue_consistency_12q` | T3 | `regr_r2`, 12q | |
+| `revenue_up_frac_12q` | T3 | share of increases, 12q | |
+| `revenue_trend_20q` | T5 | same fit over 20 quarters | |
+| `revenue_consistency_20q` | T5 | `regr_r2`, 20q | |
+| `revenue_up_frac_20q` | T5 | share of increases, 20q | |
+| `tangibles_trend_4q` | T1 | `regr_slope(ln(tangibles_q), years)`, last 4 quarterly obs | tangible book trend |
+| `tangibles_consistency_4q` | T1 | `regr_r2` of the 4q tangibles fit | |
+| `tangibles_up_frac_4q` | T1 | share of adjacent-quarter tangibles increases, 4q | |
+| `tangibles_trend_8q` | T2 | same fit over 8 quarters | |
+| `tangibles_consistency_8q` | T2 | `regr_r2`, 8q | |
+| `tangibles_up_frac_8q` | T2 | share of increases, 8q | |
+| `tangibles_trend_12q` | T3 | same fit over 12 quarters | |
+| `tangibles_consistency_12q` | T3 | `regr_r2`, 12q | |
+| `tangibles_up_frac_12q` | T3 | share of increases, 12q | |
+| `tangibles_trend_20q` | T5 | same fit over 20 quarters | |
+| `tangibles_consistency_20q` | T5 | `regr_r2`, 20q | |
+| `tangibles_up_frac_20q` | T5 | share of increases, 20q | |
+| `ocf_trend_4q` | T1 | `regr_slope(ln(ncfo), years)`, last 4 quarterly obs | NULL when OCF ≤ 0 in-window |
+| `ocf_consistency_4q` | T1 | `regr_r2` of the 4q ncfo fit | |
+| `ocf_up_frac_4q` | T1 | share of adjacent-quarter ncfo increases, 4q | |
+| `ocf_trend_8q` | T2 | same fit over 8 quarters | |
+| `ocf_consistency_8q` | T2 | `regr_r2`, 8q | |
+| `ocf_up_frac_8q` | T2 | share of increases, 8q | |
+| `ocf_trend_12q` | T3 | same fit over 12 quarters | |
+| `ocf_consistency_12q` | T3 | `regr_r2`, 12q | |
+| `ocf_up_frac_12q` | T3 | share of increases, 12q | |
+| `ocf_trend_20q` | T5 | same fit over 20 quarters | |
+| `ocf_consistency_20q` | T5 | `regr_r2`, 20q | |
+| `ocf_up_frac_20q` | T5 | share of increases, 20q | |
+| `ocf_positive_frac_4q` | T1 | share of last 4 quarterly obs with `ncfo > 0` | the OCF-sign signal where log trend is NULL |
+| `ocf_positive_frac_8q` | T2 | same, 8q | |
+| `ocf_positive_frac_12q` | T3 | same, 12q | |
+| `ocf_positive_frac_20q` | T5 | same, 20q | |
+| `fund_history_quarters` | T5 | quarterly filings present in the 20q window | short history *is* the signal |
+| `div_years_paid_10y` | T10 | fiscal years with `−ncfdiv > 0`, last 10 | |
+| `div_streak_10y` | T10 | consecutive paying years ending now, max 10 | missing/unknown year breaks it |
+| `div_cuts_10y` | T10 | YoY TTM dividend drops below 0.8× prior, last 10y | omission counts as a cut |
+| `div_history_years_10y` | T10 | annual dividend observations known, last 10 | denominator context |
 
 ## Solvency / distress
 
@@ -204,9 +275,10 @@ diff once two ingest vintages exist.
 
 ## Build order (`src/features/`, research §F8.2)
 
-`base` (as-of + lag resolution) and `market` (marketcap/EV) → `valuation` →
-`profitability` + `growth` → `solvency` → `quality` → `technical` →
-`classification`; then assembly (M5, `src/assemble/`) computes
+`base` (as-of + lag resolution), `history` (quarterly/annual buckets,
+ADR 0015) and `market` (marketcap/EV) → `valuation` →
+`profitability` + `growth` → `trend` → `solvency` → `quality` →
+`technical` → `classification`; then assembly (M5, `src/assemble/`) computes
 ranks/sector-ranks and the two assembly-stage columns (`mohanram_g7`,
 `conservative_score`, ADR 0013) — output layout in dataset.md.
 Market-regime features remain deferred behind their ablation gate

@@ -187,7 +187,7 @@ def assembled_world(tmp_path_factory) -> Path:
 
 
 def dataset_dir(data_dir: Path) -> Path:
-    return data_dir / "datasets" / "dataset_v1.0"
+    return data_dir / "datasets" / f"dataset_v{assemble_cli.DEFAULT_VERSION}"
 
 
 def query(data_dir: Path, sql: str):
@@ -439,7 +439,7 @@ def test_manifest(assembled_world):
     manifest = json.loads(
         (dataset_dir(assembled_world) / "manifest.json").read_text()
     )
-    assert manifest["dataset_version"] == "1.0"
+    assert manifest["dataset_version"] == assemble_cli.DEFAULT_VERSION
     assert manifest["horizons_years"] == [1, 2, 3, 5]
     assert manifest["params"] == {"rank_guard": 3, "min_industry_peers": 3}
     assert manifest["rows"] == 219
