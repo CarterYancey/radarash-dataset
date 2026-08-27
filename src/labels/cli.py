@@ -26,7 +26,12 @@ from pathlib import Path
 
 import duckdb
 
-from .compute import CAGR_THRESHOLDS_PCT, build_label_views, write_labels_table
+from .compute import (
+    CAGR_THRESHOLDS_PCT,
+    EXCESS_THRESHOLDS_PCT,
+    build_label_views,
+    write_labels_table,
+)
 from .delistings import build_delisting_view
 from .paths import HORIZON_YEARS, TERMINAL_WINDOW_TRADING_DAYS, build_path_views
 from .snapshots import build_snapshot_view, write_snapshot_table
@@ -129,6 +134,7 @@ def main(argv: list[str] | None = None) -> int:
             con,
             horizons=horizons,
             thresholds_pct=CAGR_THRESHOLDS_PCT,
+            excess_thresholds_pct=EXCESS_THRESHOLDS_PCT,
         )
         write_labels_table(con, interim_dir)
     finally:

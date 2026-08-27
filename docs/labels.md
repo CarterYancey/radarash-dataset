@@ -64,7 +64,11 @@ Keys and entry metadata as in `snapshots.parquet`, then per horizon `{H}`:
 | `label_{H}_cagr_ge_5` | bool | `fwd_{H}_cagr ≥ 5%` |
 | `label_{H}_cagr_ge_8` | bool | `fwd_{H}_cagr ≥ 8%` |
 | `label_{H}_cagr_ge_10` | bool | `fwd_{H}_cagr ≥ 10%` |
+| `label_{H}_cagr_ge_15` | bool | `fwd_{H}_cagr ≥ 15%` |
+| `label_{H}_cagr_ge_20` | bool | `fwd_{H}_cagr ≥ 20%` |
 | `label_{H}_beat_spy` | bool | `fwd_{H}_cagr` > SPY CAGR |
+| `label_{H}_excess_ge_5` | bool | `fwd_{H}_excess_cagr ≥ 5%` (beat SPY by ≥ 5 pts CAGR) |
+| `label_{H}_excess_ge_10` | bool | `fwd_{H}_excess_cagr ≥ 10%` (beat SPY by ≥ 10 pts CAGR) |
 | `delisted_in_window_{H}` | varchar | `'false'`, or the delist reason (decision 0002); NULL = horizon unobservable |
 
 Binary thresholds are inclusive (`≥`). Continuous CAGRs are stored so

@@ -52,6 +52,16 @@ era-identifiability probe) live on its task list, not here.
 
 - [ ] **M4 — Features.** Add a meta feature tracking if a ticker was in
       the S&P 500 at snapshot date.
+- [x] **M3 — Labels.** Tail-threshold labels (`cagr_ge_{15,20}`) and
+      excess-vs-SPY threshold labels (`excess_ge_{5,10}`) — docs/labels.md;
+      appear in the next labels build/dataset version.
+- [ ] **Training-outcomes improvement backlog** — prioritized review in
+      `docs/research/dataset-improvements.md` (2026-08-27): top items are
+      the V1/V6/V4 verifications, a valuation-vs-own-history feature
+      family, path-dependent labels (interim-low CAGR, max drawdown — the
+      PLAN §6 stage-1 widening), Ohlson O-score + magic-formula composite
+      + F-score component flags, and trend-family extensions (share count,
+      margins). Each graduates via its own ADR.
 - [x] **M4 — Features.** Trend & consistency family (long-horizon financial
       health: revenue/tangibles/OCF trends over 4/8/12/20-quarter windows,
       10-year dividend record) → `docs/decisions/0015`; dataset version

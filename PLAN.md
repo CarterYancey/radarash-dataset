@@ -143,10 +143,15 @@ CAGR so thresholds can be re-derived without recomputation):
 
 | Horizon | Absolute thresholds | Relative |
 |---|---|---|
-| 1y | ≥ 0%, ≥ 5%, ≥ 8%, ≥ 10% CAGR | beat SPY total return |
+| 1y | ≥ 0%, ≥ 5%, ≥ 8%, ≥ 10%, ≥ 15%, ≥ 20% CAGR | beat SPY; beat SPY by ≥ 5 / ≥ 10 pts CAGR |
 | 2y | same | same |
 | 3y | same | same |
 | 5y | same | same |
+
+The 15/20 rungs target the right tail (compounders/mega-performers); the
+excess-CAGR rungs express the same "big win" idea relative to the prevailing
+market, so their base rates swing less across valuation eras than the
+absolute rungs do.
 
 Additional stored columns per (snapshot, horizon):
 
