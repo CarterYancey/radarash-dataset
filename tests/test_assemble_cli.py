@@ -13,7 +13,11 @@ thin-slice guard must NULL.
 
 Assembly runs with --rank-guard 3 --min-industry-peers 3 so the four-stock
 cross-sections clear the guards (the production defaults would NULL
-everything, which is exactly what they are for).
+everything, which is exactly what they are for), and with --allow-rank-keys:
+the 2016-Q1 cross-section is the only one with four stocks, so the MONE/MTWO
+sales_yield tie there ranks 2/3 — a value no three-stock quarter can produce,
+i.e. exactly the calendar-quarter key the decision-0016 audit exists to
+catch (test_rank_audit pins the numbers and the refusal).
 """
 
 from __future__ import annotations
@@ -21,6 +25,7 @@ from __future__ import annotations
 import json
 from datetime import date, timedelta
 from pathlib import Path
+from types import SimpleNamespace
 
 import duckdb
 import pytest
@@ -28,6 +33,7 @@ import pytest
 from assemble import cli as assemble_cli
 from assemble.wide import feature_columns_in_order, rank_columns, secrank_columns
 from features import cli as features_cli
+from features.registry import FEATURES
 from features.source import ARQ_LEVEL_FIELDS, ART_FLOW_FIELDS
 from identity import cli as identity_cli
 from ingest.convert import csv_to_parquet
@@ -159,6 +165,10 @@ def build_sfp_csv() -> str:
     return "\n".join(lines) + "\n"
 
 
+ASSEMBLE_ARGS = ["--rank-guard", "3", "--min-industry-peers", "3",
+                 "--allow-rank-keys"]
+
+
 @pytest.fixture(scope="module")
 def assembled_world(tmp_path_factory) -> Path:
     """Data dir with the whole pipeline run, assembly included."""
@@ -179,10 +189,7 @@ def assembled_world(tmp_path_factory) -> Path:
     assert labels_cli.main(["--data-dir", str(data_dir)]) == 0
     assert features_cli.main(["--data-dir", str(data_dir)]) == 0
     assert splits_cli.main(["--data-dir", str(data_dir)]) == 0
-    assert assemble_cli.main(
-        ["--data-dir", str(data_dir), "--rank-guard", "3",
-         "--min-industry-peers", "3"]
-    ) == 0
+    assert assemble_cli.main(["--data-dir", str(data_dir)] + ASSEMBLE_ARGS) == 0
     return data_dir
 
 
@@ -222,6 +229,7 @@ def test_dataset_directory_contents(assembled_world):
     assert (out / "dataset.parquet").exists()
     assert (out / "splits.parquet").exists()
     assert (out / "split_folds.parquet").exists()
+    assert (out / "rank_audit.parquet").exists()
     assert (out / "manifest.json").exists()
     # The split files are verbatim copies of the interim artifacts.
     interim = assembled_world / "interim"
@@ -336,20 +344,19 @@ def test_mohanram_g7_hand_check(assembled_world):
     #   MTHR: roa ✓, cfo ✓, cfo>roa ✓, vars ✗✗, rnd ✗, capex ✓ = 4
     rows = machinery(
         assembled_world,
-        "roa_variability_3y, revenue_growth_variability_3y, mohanram_g7, "
-        "mohanram_g7_rank",
+        "roa_variability_3y, revenue_growth_variability_3y, mohanram_g7",
         "2017-04-03",
     )
     stddev_mthr = (
         (0.1 ** 2 + 0.1 ** 2 + 0.25 ** 2) / 3
         - ((0.1 - 0.1 + 0.25) / 3) ** 2
     ) ** 0.5 * (3 / 2) ** 0.5
-    assert rows[0] == (0.0, 0.0, 2, pytest.approx(0.5))
+    assert rows[0] == (0.0, 0.0, 2)
     assert rows[1][0] == pytest.approx(0.0129099, abs=1e-6)
-    assert rows[1][1:] == (0.0, 1, pytest.approx(0.0))
+    assert rows[1][1:] == (0.0, 1)
     assert rows[2][0] == 0.0
     assert rows[2][1] == pytest.approx(stddev_mthr)
-    assert rows[2][2:] == (4, pytest.approx(1.0))
+    assert rows[2][2] == 4
 
     # SOLO has no famaindustry peers and no T3 chain: NULL composite.
     assert one_row(
@@ -361,17 +368,19 @@ def test_mohanram_g7_hand_check(assembled_world):
 
 def test_conservative_score_hand_check(assembled_world):
     # Constant prices: vol_36m and mom_12_2 tie at 0 -> both ranks 0 for
-    # everyone. Net payout yield: 0.01/0.02/0.03 -> ranks 0/0.5/1.
-    # conservative = (1 - 0) + 0 + npy_rank.
+    # everyone. Net payout yield 0.01/0.02/0.03 is zero-pinned at 0.5
+    # (ADR 0016), all three positive -> 0.5 + 0.5 * {0, 0.5, 1} =
+    # 0.5/0.75/1. conservative = (1 - 0) + 0 + npy_rank.
     rows = machinery(
         assembled_world,
-        "net_payout_yield, conservative_score, conservative_score_rank",
+        "net_payout_yield, net_payout_yield_rank, conservative_score, "
+        "conservative_score_rank",
         "2017-04-03",
     )
     assert rows == [
-        (pytest.approx(0.01), pytest.approx(1.0), pytest.approx(0.0)),
-        (pytest.approx(0.02), pytest.approx(1.5), pytest.approx(0.5)),
-        (pytest.approx(0.03), pytest.approx(2.0), pytest.approx(1.0)),
+        (pytest.approx(0.01), pytest.approx(0.5), pytest.approx(1.5), pytest.approx(0.0)),
+        (pytest.approx(0.02), pytest.approx(0.75), pytest.approx(1.75), pytest.approx(0.5)),
+        (pytest.approx(0.03), pytest.approx(1.0), pytest.approx(2.0), pytest.approx(1.0)),
     ]
 
     # SOLO traded one quarter: no vol_36m -> no conservative score.
@@ -380,6 +389,151 @@ def test_conservative_score_hand_check(assembled_world):
         "SELECT conservative_score FROM {t} WHERE permaticker = 500004 "
         "AND snapshot_kind = 'median'",
     ) == (None,)
+
+
+def test_zero_pinned_ranks(assembled_world):
+    """ADR 0016 pinned_zero: exact zeros sit at the pin in every quarter;
+    the non-zero support is percent-ranked on the pin's far side."""
+    # dividend_yield (pin 0): MTHR pays nothing -> 0.0; MONE 0.01 and MTWO
+    # 0.02 are the payers -> ranked among themselves 0/1 -> 0.0 + 1.0 * pr.
+    # The smallest payer therefore shares the pin with the non-payers.
+    rows = machinery(
+        assembled_world, "dividend_yield, dividend_yield_rank", "2017-04-03"
+    )
+    assert rows == [
+        (pytest.approx(0.01), pytest.approx(0.0)),
+        (pytest.approx(0.02), pytest.approx(1.0)),
+        (pytest.approx(0.0), pytest.approx(0.0)),
+    ]
+    # rnd_to_assets (pin 0): MTHR reports no R&D (coalesced to 0, ADR 0013)
+    # -> 0.0; MTWO 0.02 is the smallest reporter -> 0.0; MONE 0.05 -> 1.0.
+    rows = machinery(
+        assembled_world, "rnd_to_assets, rnd_to_assets_rank", "2017-04-03"
+    )
+    assert rows == [
+        (pytest.approx(0.05), pytest.approx(1.0)),
+        (pytest.approx(0.02), pytest.approx(0.0)),
+        (pytest.approx(0.0), pytest.approx(0.0)),
+    ]
+    # dist_52w_high (pin 1): constant prices keep every stock exactly at its
+    # 52-week high -> the zero group is pinned at the top, not the bottom.
+    rows = machinery(
+        assembled_world, "dist_52w_high, dist_52w_high_rank", "2017-04-03"
+    )
+    assert rows == [(pytest.approx(0.0), pytest.approx(1.0))] * 3
+    # The pin is a fixed constant across quarters: the zero group's rank
+    # never equals the quarter's zero share.
+    assert query(
+        assembled_world,
+        """
+        SELECT count(*) FROM {t}
+        WHERE (dividend_yield = 0 AND dividend_yield_rank != 0.0)
+           OR (rnd_to_assets = 0 AND rnd_to_assets_rank != 0.0)
+           OR (net_payout_yield = 0 AND net_payout_yield_rank != 0.5)
+           OR (dist_52w_high = 0 AND dist_52w_high_rank != 1.0)
+        """,
+    ) == [(0,)]
+
+
+def test_integer_valued_features_are_not_ranked(assembled_world):
+    """ADR 0016: integer composites, counts and shares ship raw only."""
+    emitted = {
+        r[0]
+        for r in duckdb.sql(
+            f"DESCRIBE SELECT * FROM '{dataset_dir(assembled_world) / 'dataset.parquet'}'"
+        ).fetchall()
+    }
+    unranked = [s.name for s in FEATURES if s.kind == "numeric" and not s.ranked]
+    assert {"piotroski_f", "mohanram_g7", "fund_history_quarters",
+            "fundamentals_age_days", "revenue_up_frac_4q",
+            "ocf_positive_frac_20q", "div_streak_10y"} <= set(unranked)
+    for name in unranked:
+        assert name in emitted, name
+        assert f"{name}_rank" not in emitted, name
+        assert f"{name}_secrank" not in emitted, name
+    # The integer score itself is still there and hand-checkable.
+    assert one_row(
+        assembled_world,
+        "SELECT piotroski_f FROM {t} WHERE permaticker = 500001 "
+        "AND snapshot_kind = 'median' AND snapshot_date = DATE '2017-04-03'",
+    )[0] in range(0, 10)
+
+
+def test_rank_audit(assembled_world):
+    """ADR 0016: the build refuses a rank column that keys the quarter."""
+    # Without --allow-rank-keys the fixture world is refused (exit 1) and
+    # no dataset directory is left behind.
+    args = ["--data-dir", str(assembled_world), "--dataset-version",
+            "1.2-audit", "--rank-guard", "3", "--min-industry-peers", "3"]
+    assert assemble_cli.main(args) == 1
+    assert not (assembled_world / "datasets" / "dataset_v1.2-audit").exists()
+
+    cursor = duckdb.sql(
+        f"SELECT * FROM '{dataset_dir(assembled_world) / 'rank_audit.parquet'}'"
+    )
+    fields = [d[0] for d in cursor.description]
+    audit = {
+        (r["rank_column"], r["snapshot_kind"]): SimpleNamespace(**r)
+        for r in (dict(zip(fields, row)) for row in cursor.fetchall())
+    }
+
+    # sales_yield_rank, median kind. 2013-Q1 predates every filing (no
+    # rows); the other 23 quarters hold 3 machinery rows, 2016-Q1 also SOLO
+    # -> 70 rows. Three-stock quarters rank 0/0.5/1 — except the three
+    # FY2014-T0 quarters 2015-Q2..Q4, where MONE and MTWO tie at 1.0 sales
+    # yield (ranks 0/0.5/0.5, two values); 2016-Q1 ranks 0, 1/3, 2/3, 2/3.
+    # Distinct values {0, 1/3, 0.5, 2/3, 1} = 5; pairs 19×3 + 3×2 + 3 = 66.
+    # Ties: the recurring 0.5 (2 rows × 3 quarters) plus 2016-Q1's 2/3 (2
+    # rows) -> tie_mass 8/70; only the 2/3 tie is a value no other quarter
+    # produces -> keyed_mass 2/70, and it is half of that quarter's
+    # cross-section -> max_key_share 0.5, the key the gate catches.
+    row = audit[("sales_yield_rank", "median")]
+    assert (row.n_rows, row.quarters, row.distinct_values,
+            row.distinct_quarter_value_pairs) == (70, 23, 5, 66)
+    assert row.tie_mass == pytest.approx(8 / 70)
+    assert row.keyed_mass == pytest.approx(2 / 70)
+    assert row.max_key_share == pytest.approx(0.5)
+
+    # vol_36m_rank: constant prices tie every stock at 0 in every quarter,
+    # so tie_mass is 1 — but 0.0 recurs in every quarter, so nothing is
+    # keyed. Tie mass alone is not the gate.
+    row = audit[("vol_36m_rank", "median")]
+    assert row.tie_mass == pytest.approx(1.0)
+    assert (row.keyed_mass, row.max_key_share) == (0.0, 0.0)
+    assert row.distinct_values == 1
+
+    # dividend_yield_rank: the non-payer MTHR is pinned at 0.0 and the
+    # smallest payer MONE ranks 0.0 among the payers, so two of three rows
+    # tie in every quarter (tie_mass 2/3) — at the pin, which recurs in
+    # every quarter, so nothing is keyed.
+    row = audit[("dividend_yield_rank", "median")]
+    assert row.tie_mass == pytest.approx(2 / 3)
+    assert (row.keyed_mass, row.max_key_share) == (0.0, 0.0)
+
+    # The manifest carries the gate, the flagged columns and the policy.
+    manifest = json.loads(
+        (dataset_dir(assembled_world) / "manifest.json").read_text()
+    )
+    assert manifest["params"]["allow_rank_keys"] is True
+    assert manifest["rank_audit"]["max_key_share_threshold"] == 0.02
+    assert manifest["rank_audit"]["flagged"] == {
+        "asset_turnover_rank": 0.5, "sales_yield_rank": 0.5,
+    }
+    assert manifest["rank_audit"]["columns"]["vol_36m_rank"] == {
+        "tie_mass": 1.0, "keyed_mass": 0.0, "max_key_share": 0.0,
+    }
+    # Every rank column with at least one non-NULL value is audited; the
+    # all-NULL ones (unmet tiers in this short world) have nothing to key.
+    audited = set(manifest["rank_audit"]["columns"])
+    assert audited <= set(rank_columns()) | set(secrank_columns())
+    assert {"sales_yield_rank", "sales_yield_secrank", "vol_36m_rank",
+            "conservative_score_rank"} <= audited
+    policy = manifest["rank_policy"]
+    assert policy["dividend_yield"] == {"rank": "pinned_zero", "zero_rank": 0.0}
+    assert policy["net_payout_yield"] == {"rank": "pinned_zero", "zero_rank": 0.5}
+    assert policy["dist_52w_high"] == {"rank": "pinned_zero", "zero_rank": 1.0}
+    assert policy["earnings_yield"] == {"rank": "full"}
+    assert "piotroski_f" not in policy and "mohanram_g7" not in policy
 
 
 def test_uniqueness_weights(assembled_world):
@@ -441,7 +595,10 @@ def test_manifest(assembled_world):
     )
     assert manifest["dataset_version"] == assemble_cli.DEFAULT_VERSION
     assert manifest["horizons_years"] == [1, 2, 3, 5]
-    assert manifest["params"] == {"rank_guard": 3, "min_industry_peers": 3}
+    assert manifest["params"] == {
+        "rank_guard": 3, "min_industry_peers": 3, "max_key_share": 0.02,
+        "allow_rank_keys": True,
+    }
     assert manifest["rows"] == 219
     assert manifest["permatickers"] == 4
     assert manifest["input_rows"]["labels"] == 219
@@ -454,8 +611,7 @@ def test_manifest(assembled_world):
 
 
 def test_dataset_versions_are_immutable(assembled_world):
-    args = ["--data-dir", str(assembled_world), "--rank-guard", "3",
-            "--min-industry-peers", "3"]
+    args = ["--data-dir", str(assembled_world)] + ASSEMBLE_ARGS
     assert assemble_cli.main(args) == 1  # refuses to overwrite
     assert assemble_cli.main(args + ["--force"]) == 0
 

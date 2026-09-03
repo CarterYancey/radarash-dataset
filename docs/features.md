@@ -7,7 +7,8 @@
 [0006](decisions/0006-staleness-policy.md) (staleness),
 [0007](decisions/0007-market-inputs-daily-pit.md) (market inputs),
 [0008](decisions/0008-rank-representation.md) (ranks),
-[0015](decisions/0015-trend-consistency-features.md) (trend & consistency, v1.1).
+[0015](decisions/0015-trend-consistency-features.md) (trend & consistency, v1.1),
+[0016](decisions/0016-rank-quarter-keys.md) (per-feature rank policy, v1.2).
 `src/features/` implements this registry in the build order below.
 Research trail: [research/features.md](research/features.md).
 
@@ -41,11 +42,19 @@ versions diffable from the registry alone.
   fundamental denominator are NULL when the denominator is ≤ 0 or missing;
   the sign information lives once in the flag features. No winsorization,
   no imputation.
-- **Ranks** (ADR 0008): every numeric feature also ships
-  `{name}_rank` = `percent_rank` within (calendar quarter, snapshot_kind),
-  NULL-safe, thin-slice guard 20. Rows marked **S** additionally ship
-  `{name}_secrank` within (quarter, kind, sector). Flags (bool) and
-  classification columns are not ranked.
+- **Ranks** (ADR 0008, policy per feature ADR 0016): a numeric feature
+  ships `{name}_rank` = `percent_rank` within (calendar quarter,
+  snapshot_kind), NULL-safe, thin-slice guard 20 — unless its notes say
+  otherwise. **not ranked**: integer-valued composites, counts and shares
+  (a tied score group's within-quarter rank is a quarter identifier; the
+  raw score is already comparable). **zero-pinned rank (z)**: features
+  with a mass at exactly zero — zeros take the fixed rank *z*, non-zero
+  values are percent-ranked within their sign class onto the matching side
+  of the pin (negatives in [0, z], positives in [z, 1]). Rows marked **S**
+  additionally ship `{name}_secrank` within (quarter, kind, sector) under
+  the same policy. Flags (bool) and classification columns are never
+  ranked. Assembly audits every rank column for calendar-quarter keys and
+  refuses a build that carries one (dataset.md).
 - **Tiers** (ADR 0004): T0 current filing; T1/T2/T3 = +1/2/3 fiscal years;
   P12/P36 = 252/756 trading days of `SEP.closeadj`; T5/T10 = +20 quarters /
   +10 fiscal years (ADR 0015). Tier = what the feature *needs*; unmet ⇒
@@ -68,7 +77,7 @@ versions diffable from the registry alone.
 |---|---|---|---|
 | `fund_datekey` | T0 | `datekey` of the filing used | metadata, not ranked |
 | `fund_reportperiod` | T0 | `reportperiod` of that filing | metadata, not ranked |
-| `fundamentals_age_days` | T0 | `snapshot_date − datekey` | **feature**, ranked (ADR 0006) |
+| `fundamentals_age_days` | T0 | `snapshot_date − datekey` | **feature** (ADR 0006); not ranked — integer days (ADR 0016) |
 | `has_filing_183d` / `has_filing_365d` | T0 | age ≤ 183 / 365 | flags (ADR 0006) |
 | `negative_equity` | T0 | `equity_q ≤ 0` | flag |
 | `negative_ebitda` | T0 | `ebitda ≤ 0` | flag |
@@ -81,13 +90,13 @@ versions diffable from the registry alone.
 | `earnings_yield` | T0 | `netinc / marketcap` | S |
 | `ocf_yield` | T0 | `ncfo / marketcap` | S |
 | `fcf_yield` | T0 | `fcf / marketcap` | S |
-| `sales_yield` | T0 | `revenue / marketcap` | S |
+| `sales_yield` | T0 | `revenue / marketcap` | S; zero-pinned rank (0) — pre-revenue firms |
 | `book_to_market` | T0 | `equity_q / marketcap` | S; negative book kept (yield orientation) |
 | `tangible_book_to_market` | T0 | `tangibles_q / marketcap` | S |
 | `ebit_to_ev` | T0 | `ebit / ev` | S; NULL if `ev ≤ 0`; Magic-formula earnings yield |
 | `ebitda_to_ev` | T0 | `ebitda / ev` | S; NULL if `ev ≤ 0` |
-| `dividend_yield` | T0 | `−ncfdiv / marketcap` | cash-flow-statement convention |
-| `net_payout_yield` | T0 | `−(ncfdiv + ncfcommon) / marketcap` | Conservative-formula input |
+| `dividend_yield` | T0 | `−ncfdiv / marketcap` | cash-flow-statement convention; zero-pinned rank (0) — non-payers |
+| `net_payout_yield` | T0 | `−(ncfdiv + ncfcommon) / marketcap` | Conservative-formula input; zero-pinned rank (0.5) — signed, no payout or issuance at 0.5 |
 | `ncav_to_marketcap` | T0 ⌂ | `(assetsc_q − liabilities_q) / marketcap` | Graham net-net discount |
 | `ev_to_marketcap` | T0 | `ev / marketcap` | leverage-in-price; negative-EV magnitude |
 
@@ -105,7 +114,7 @@ versions diffable from the registry alone.
 | `net_margin` | T0 | `netinc / revenue` | S |
 | `fcf_margin` | T0 | `fcf / revenue` | |
 | `cfo_to_assets` | T0 | `ncfo / assets_q` | G-score CFROA |
-| `asset_turnover` | T0 | `revenue / assets_q` | F-score & Z input |
+| `asset_turnover` | T0 | `revenue / assets_q` | F-score & Z input; zero-pinned rank (0) — pre-revenue firms |
 
 All `x / revenue` NULL when `revenue ≤ 0`; denominators are current-quarter
 levels, not `*avg` (one convention everywhere; noted deviation from
@@ -123,7 +132,7 @@ textbook ROA).
 | `gross_margin_delta_2y` | T2 | `gross_margin − gross_margin₋₂` | trend depth |
 | `asset_turnover_delta_1y` | T1 | `asset_turnover − asset_turnover₋₁` | F-score signal 9 |
 | `asset_growth_1y` | T1 | `assets_q / assets_q₋₁ − 1` | Cooper–Gulen–Schill |
-| `share_count_growth_1y` | T1 | `(sharesbas·sharefactor) YoY − 1` | dilution; F-score signal 7 proxy |
+| `share_count_growth_1y` | T1 | `(sharesbas·sharefactor) YoY − 1` | dilution; F-score signal 7 proxy; zero-pinned rank (0.5) — unchanged share count at 0.5 |
 
 ## Trend & consistency (ADR 0015; added in v1.1)
 
@@ -144,49 +153,49 @@ dividend year ⇒ the dividend counters are NULL.
 |---|---|---|---|
 | `revenue_trend_4q` | T1 | `regr_slope(ln(revenue), years)`, last 4 quarterly obs | annualized log growth |
 | `revenue_consistency_4q` | T1 | `regr_r2` of the 4q revenue fit | 1 = textbook compounder |
-| `revenue_up_frac_4q` | T1 | share of adjacent-quarter revenue increases, 4q | |
+| `revenue_up_frac_4q` | T1 | share of adjacent-quarter revenue increases, 4q | not ranked (w+1 values) |
 | `revenue_trend_8q` | T2 | same fit over 8 quarters | |
 | `revenue_consistency_8q` | T2 | `regr_r2`, 8q | |
-| `revenue_up_frac_8q` | T2 | share of increases, 8q | |
+| `revenue_up_frac_8q` | T2 | share of increases, 8q | not ranked (w+1 values) |
 | `revenue_trend_12q` | T3 | same fit over 12 quarters | |
 | `revenue_consistency_12q` | T3 | `regr_r2`, 12q | |
-| `revenue_up_frac_12q` | T3 | share of increases, 12q | |
+| `revenue_up_frac_12q` | T3 | share of increases, 12q | not ranked (w+1 values) |
 | `revenue_trend_20q` | T5 | same fit over 20 quarters | |
 | `revenue_consistency_20q` | T5 | `regr_r2`, 20q | |
-| `revenue_up_frac_20q` | T5 | share of increases, 20q | |
+| `revenue_up_frac_20q` | T5 | share of increases, 20q | not ranked (w+1 values) |
 | `tangibles_trend_4q` | T1 | `regr_slope(ln(tangibles_q), years)`, last 4 quarterly obs | tangible book trend |
 | `tangibles_consistency_4q` | T1 | `regr_r2` of the 4q tangibles fit | |
-| `tangibles_up_frac_4q` | T1 | share of adjacent-quarter tangibles increases, 4q | |
+| `tangibles_up_frac_4q` | T1 | share of adjacent-quarter tangibles increases, 4q | not ranked (w+1 values) |
 | `tangibles_trend_8q` | T2 | same fit over 8 quarters | |
 | `tangibles_consistency_8q` | T2 | `regr_r2`, 8q | |
-| `tangibles_up_frac_8q` | T2 | share of increases, 8q | |
+| `tangibles_up_frac_8q` | T2 | share of increases, 8q | not ranked (w+1 values) |
 | `tangibles_trend_12q` | T3 | same fit over 12 quarters | |
 | `tangibles_consistency_12q` | T3 | `regr_r2`, 12q | |
-| `tangibles_up_frac_12q` | T3 | share of increases, 12q | |
+| `tangibles_up_frac_12q` | T3 | share of increases, 12q | not ranked (w+1 values) |
 | `tangibles_trend_20q` | T5 | same fit over 20 quarters | |
 | `tangibles_consistency_20q` | T5 | `regr_r2`, 20q | |
-| `tangibles_up_frac_20q` | T5 | share of increases, 20q | |
+| `tangibles_up_frac_20q` | T5 | share of increases, 20q | not ranked (w+1 values) |
 | `ocf_trend_4q` | T1 | `regr_slope(ln(ncfo), years)`, last 4 quarterly obs | NULL when OCF ≤ 0 in-window |
 | `ocf_consistency_4q` | T1 | `regr_r2` of the 4q ncfo fit | |
-| `ocf_up_frac_4q` | T1 | share of adjacent-quarter ncfo increases, 4q | |
+| `ocf_up_frac_4q` | T1 | share of adjacent-quarter ncfo increases, 4q | not ranked (w+1 values) |
 | `ocf_trend_8q` | T2 | same fit over 8 quarters | |
 | `ocf_consistency_8q` | T2 | `regr_r2`, 8q | |
-| `ocf_up_frac_8q` | T2 | share of increases, 8q | |
+| `ocf_up_frac_8q` | T2 | share of increases, 8q | not ranked (w+1 values) |
 | `ocf_trend_12q` | T3 | same fit over 12 quarters | |
 | `ocf_consistency_12q` | T3 | `regr_r2`, 12q | |
-| `ocf_up_frac_12q` | T3 | share of increases, 12q | |
+| `ocf_up_frac_12q` | T3 | share of increases, 12q | not ranked (w+1 values) |
 | `ocf_trend_20q` | T5 | same fit over 20 quarters | |
 | `ocf_consistency_20q` | T5 | `regr_r2`, 20q | |
-| `ocf_up_frac_20q` | T5 | share of increases, 20q | |
-| `ocf_positive_frac_4q` | T1 | share of last 4 quarterly obs with `ncfo > 0` | the OCF-sign signal where log trend is NULL |
-| `ocf_positive_frac_8q` | T2 | same, 8q | |
-| `ocf_positive_frac_12q` | T3 | same, 12q | |
-| `ocf_positive_frac_20q` | T5 | same, 20q | |
-| `fund_history_quarters` | T5 | quarterly filings present in the 20q window | short history *is* the signal |
-| `div_years_paid_10y` | T10 | fiscal years with `−ncfdiv > 0`, last 10 | |
-| `div_streak_10y` | T10 | consecutive paying years ending now, max 10 | missing/unknown year breaks it |
-| `div_cuts_10y` | T10 | YoY TTM dividend drops below 0.8× prior, last 10y | omission counts as a cut |
-| `div_history_years_10y` | T10 | annual dividend observations known, last 10 | denominator context |
+| `ocf_up_frac_20q` | T5 | share of increases, 20q | not ranked (w+1 values) |
+| `ocf_positive_frac_4q` | T1 | share of last 4 quarterly obs with `ncfo > 0` | the OCF-sign signal where log trend is NULL; not ranked (w+1 values) |
+| `ocf_positive_frac_8q` | T2 | same, 8q | not ranked (w+1 values) |
+| `ocf_positive_frac_12q` | T3 | same, 12q | not ranked (w+1 values) |
+| `ocf_positive_frac_20q` | T5 | same, 20q | not ranked (w+1 values) |
+| `fund_history_quarters` | T5 | quarterly filings present in the 20q window | short history *is* the signal; not ranked (count) |
+| `div_years_paid_10y` | T10 | fiscal years with `−ncfdiv > 0`, last 10 | not ranked (count) |
+| `div_streak_10y` | T10 | consecutive paying years ending now, max 10 | missing/unknown year breaks it; not ranked (count) |
+| `div_cuts_10y` | T10 | YoY TTM dividend drops below 0.8× prior, last 10y | omission counts as a cut; not ranked (count) |
+| `div_history_years_10y` | T10 | annual dividend observations known, last 10 | denominator context; not ranked (count) |
 
 ## Solvency / distress
 
@@ -202,7 +211,7 @@ dividend year ⇒ the dividend counters are NULL.
 | `current_ratio` | T0 ⌂ | `assetsc_q / liabilitiesc_q` | F-score signal 6 base |
 | `quick_ratio` | T0 ⌂ | `(assetsc_q − inventory_q) / liabilitiesc_q` | |
 | `cash_to_assets` | T0 | `cashneq_q / assets_q` | |
-| `debt_to_equity` | T0 | `debt_q / equity_q` | NULL if `equity_q ≤ 0` |
+| `debt_to_equity` | T0 | `debt_q / equity_q` | NULL if `equity_q ≤ 0`; zero-pinned rank (0) — debt-free firms |
 | `net_debt_to_ebitda` | T0 | `(debt_q − cashneq_q) / ebitda` | NULL if `ebitda ≤ 0` |
 | `interest_coverage` | T0 | `ebit / intexp` | NULL if `intexp ≤ 0` (no debt ⇒ NULL, not ∞) |
 | `ffo_to_liabilities` | T0 | `ncfo / liabilities_q` | O component (FFO proxied by CFO, §F1 gap) |
@@ -230,14 +239,14 @@ composite is deferred (ADR 0003) — its components are all above.
 | `lvgi` | T1 ⌂ | `((debt_q + liabilitiesc_q)/assets_q)` YoY ratio | |
 | `accruals_to_assets` | T0 | `(netinc − ncfo) / assets_q` | S; TATA & Sloan accruals (CF method), one column |
 | `beneish_m` | T1 ⌂ | `−4.84 + 0.92·dsri + 0.528·gmi + 0.404·aqi + 0.892·sgi + 0.115·depi − 0.172·sgai + 4.679·tata − 0.327·lvgi` | composite |
-| `piotroski_f` | T1 | count of the 9 signals (research §F2.2 table) | composite, 0–9; signals from components above + `ncfcommon ≤ 0` |
+| `piotroski_f` | T1 | count of the 9 signals (research §F2.2 table) | composite, 0–9; signals from components above + `ncfcommon ≤ 0`; not ranked (integer score, ADR 0016) |
 | `noa_to_assets` | T1 | `((assets_q − cashneq_q − investments_q) − (liabilities_q − debt_q)) / assets_q₋₁` | Hirshleifer NOA |
-| `ext_financing_to_assets` | T0 | `(ncfcommon + ncfdebt) / assets_q` | Bradshaw–Richardson–Sloan |
-| `rnd_to_assets` | T0 | `coalesce(rnd, 0) / assets_q` | G-score input; unreported R&D counts as 0 — the one explicit fill (ADR 0013) |
-| `capex_to_assets` | T0 | `−capex / assets_q` | G-score input; cash-flow sign convention |
+| `ext_financing_to_assets` | T0 | `(ncfcommon + ncfdebt) / assets_q` | Bradshaw–Richardson–Sloan; zero-pinned rank (0.5) — signed, no external financing at 0.5 |
+| `rnd_to_assets` | T0 | `coalesce(rnd, 0) / assets_q` | G-score input; unreported R&D counts as 0 — the one explicit fill (ADR 0013); zero-pinned rank (0) |
+| `capex_to_assets` | T0 | `−capex / assets_q` | G-score input; cash-flow sign convention; zero-pinned rank (0) — no capex |
 | `roa_variability_3y` | T3 | stddev of `{roa, roa₋₁, roa₋₂, roa₋₃}` | G-score input; NULL unless all four exist |
 | `revenue_growth_variability_3y` | T3 | stddev of the 3 YoY revenue growths | G-score input; NULL unless all three exist |
-| `mohanram_g7` | T3 | 7-signal variant vs. `famaindustry` medians (ADR 0013) | **assembly-stage** (needs cross-section); advertising signal unavailable |
+| `mohanram_g7` | T3 | 7-signal variant vs. `famaindustry` medians (ADR 0013) | **assembly-stage** (needs cross-section); advertising signal unavailable; not ranked (integer score, ADR 0016) |
 
 ## Technical (from `SEP.closeadj`; differs across snapshot kinds)
 
@@ -248,7 +257,7 @@ composite is deferred (ADR 0003) — its components are all above.
 | `ret_1m` | P12 | total return t−21 → t | short-term reversal |
 | `vol_12m` | P12 | ann. σ of daily log returns, ≥200 obs | |
 | `vol_36m` | P36 | same over 756d, ≥600 obs | Conservative-formula input |
-| `dist_52w_high` | P12 | `closeadj / max₍t−252…t₎ closeadj − 1` | |
+| `dist_52w_high` | P12 | `closeadj / max₍t−252…t₎ closeadj − 1` | ≤ 0; zero-pinned rank (1) — at the 52-week high sits at the top |
 | `log_marketcap` | T0 | `ln(marketcap)` | |
 | `dollar_volume_3m` | P12 | median daily `close × volume`, t−63 → t | liquidity column (TODO microcap question) |
 | `amihud_12m` | P12 | mean `|ret| / (close × volume)` | illiquidity |
@@ -279,8 +288,9 @@ diff once two ingest vintages exist.
 ADR 0015) and `market` (marketcap/EV) → `valuation` →
 `profitability` + `growth` → `trend` → `solvency` → `quality` →
 `technical` → `classification`; then assembly (M5, `src/assemble/`) computes
-ranks/sector-ranks and the two assembly-stage columns (`mohanram_g7`,
-`conservative_score`, ADR 0013) — output layout in dataset.md.
+ranks/sector-ranks under each feature's rank policy (ADR 0016), the two
+assembly-stage columns (`mohanram_g7`, `conservative_score`, ADR 0013) and
+the rank-column quarter-key audit — output layout in dataset.md.
 Market-regime features remain deferred behind their ablation gate
 (PLAN §5.6). Each family writes `data/interim/features/{family}.parquet` on
 the shared key; families never read each other's outputs.

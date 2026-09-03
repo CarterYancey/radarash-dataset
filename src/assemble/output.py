@@ -7,6 +7,11 @@ in registry order (assembly-stage composites in place), rank columns,
 sector-rank columns, the label matrix, then `sample_weight_{H}y` — with
 weights NULLed wherever the horizon's label is unobservable (decision
 0012 §4).
+
+After the parquet is written, the rank columns are audited for calendar-
+quarter keys (decision 0016, `audit.py`); the audit table ships as
+`rank_audit.parquet` and is summarised in the manifest. A failing audit
+removes the directory and raises, unless the caller allows the keys.
 """
 
 from __future__ import annotations
@@ -22,10 +27,19 @@ import duckdb
 from features.registry import FEATURES
 from identity.source import sql_quote
 
+from .audit import (
+    MAX_KEY_SHARE,
+    build_rank_audit_table,
+    flagged_detail,
+    rank_audit_summary,
+    rank_key_error,
+    write_rank_audit,
+)
 from .source import key_meta_columns, label_matrix_columns
 from .wide import (
     feature_columns_in_order,
     rank_columns,
+    rank_policy,
     secrank_columns,
 )
 
@@ -82,10 +96,15 @@ def write_dataset(
     splits_parquet: Path,
     folds_parquet: Path,
     inputs: dict[str, Path],
-    params: dict[str, int],
+    params: dict[str, object],
     force: bool = False,
+    max_key_share: float = MAX_KEY_SHARE,
+    allow_rank_keys: bool = False,
 ) -> Path:
-    """Write data/datasets/dataset_v{version}/; return the directory."""
+    """Write data/datasets/dataset_v{version}/; return the directory.
+
+    Raises ValueError (after removing the directory) when a rank column
+    fails the quarter-key audit and `allow_rank_keys` is False."""
     out_dir = datasets_dir / f"dataset_v{version}"
     if out_dir.exists():
         if not force:
@@ -108,6 +127,35 @@ def write_dataset(
     ).fetchone()[0]
     for src in (splits_parquet, folds_parquet):
         shutil.copy2(src, out_dir / src.name)
+
+    # Decision 0016: no rank column may identify the calendar quarter.
+    build_rank_audit_table(
+        con,
+        dataset_parquet=dataset_path,
+        columns=rank_columns() + secrank_columns(),
+    )
+    write_rank_audit(con, out_dir / "rank_audit.parquet")
+    audit = rank_audit_summary(con, max_key_share=max_key_share)
+    detail = flagged_detail(con, max_key_share=max_key_share)
+    if detail:
+        for col, kind, share in detail:
+            logger.warning(
+                "rank audit: %s (%s) max quarter-key share %.3f > %.3f",
+                col, kind, share, max_key_share,
+            )
+        if not allow_rank_keys:
+            shutil.rmtree(out_dir)
+            raise ValueError(rank_key_error(detail, max_key_share=max_key_share))
+        logger.warning(
+            "rank audit: %d keyed rank column(s) published under "
+            "--allow-rank-keys; see manifest.json['rank_audit']['flagged']",
+            len(audit["flagged"]),
+        )
+    else:
+        logger.info(
+            "rank audit: %d rank columns, none exceed quarter-key share %.3f",
+            len(audit["columns"]), max_key_share,
+        )
 
     permatickers = con.execute(
         "SELECT count(DISTINCT permaticker) FROM dataset_wide"
@@ -133,11 +181,13 @@ def write_dataset(
         "dataset_version": version,
         "created_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "horizons_years": list(horizons),
-        "params": params,
+        "params": {**params, "allow_rank_keys": bool(allow_rank_keys)},
         "rows": int(rows),
         "permatickers": int(permatickers),
         "effective_rows": effective,
         "columns": {group: list(cols) for group, cols in groups.items()},
+        "rank_policy": rank_policy(),
+        "rank_audit": audit,
         "feature_versions": {
             spec.name: {
                 "added": spec.added_in_version,

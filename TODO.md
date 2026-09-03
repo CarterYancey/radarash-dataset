@@ -35,7 +35,7 @@ resolved questions get an ADR in `docs/decisions/` and are checked off here.
 
 ## Current state & next
 
-All five milestones' code is shipped and `dataset_v1.0` builds end-to-end
+All five milestones' code is shipped and `dataset_v1.2` builds end-to-end
 from a raw ingest (`make all`); the 2026-07-18 real-data QA reports are
 committed under `docs/research/reports/`. What remains in this repo:
 
@@ -67,6 +67,17 @@ era-identifiability probe) live on its task list, not here.
       10-year dividend record) → `docs/decisions/0015`; dataset version
       1.1. *(Motivated by models surfacing stocks without a consistent
       financial history at inference.)*
+- [x] **M5 — Assembly.** Rank columns leaked the calendar quarter (the
+      downstream era probe dated rows at 0.95 from ranks alone: tied groups
+      rank at the quarter's below-share). Per-feature rank policy — no
+      ranks for integer scores/counts/shares, zero-pinned ranks for
+      mass-point features — plus a build-time quarter-key audit that fails
+      the build → `docs/decisions/0016`, brief archived in
+      `docs/research/rank-quarter-keys.md`; dataset version **1.2**
+      (breaking for rank-fed consumers). *Remaining: the first real-data
+      v1.2 build is the audit's first real test — a flagged column means
+      "declare its policy in the registry", then downstream re-runs the
+      era probe as the acceptance test.*
 
 ## Verification tasks (do these before trusting anything)
 

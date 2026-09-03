@@ -5,8 +5,9 @@ View chain (each a pure-SQL temp view over the previous):
     wide_raw       labels_src ⋈ the eight feat_{family} views (inner, on the
                    shared snapshot key)
     wide_g         + mohanram_g7 from famaindustry medians (decision 0013)
-    wide_r1        + {name}_rank / {name}_secrank for every registry numeric
-                   except conservative_score (decision 0008 mechanics)
+    wide_r1        + {name}_rank / {name}_secrank for every registry feature
+                   whose rank policy is not "none", except conservative_score
+                   (decision 0008 mechanics, decision 0016 policy)
     wide_r2        + conservative_score from the pass-1 ranks
     wide_features  + conservative_score_rank
 
@@ -14,13 +15,22 @@ Rank rule (decision 0008): `percent_rank()` within (calendar quarter,
 snapshot_kind) — plus Sharadar `sector` for the `_secrank` allowlist — over
 non-NULL values only, NULL raw ⇒ NULL rank, cross-sections with fewer than
 `rank_guard` non-NULL values ⇒ NULL rank.
+
+Per-feature policy (decision 0016, `FeatureSpec.rank`): `full` is the rule
+above; `pinned_zero` pins exact zeros at the spec's `zero_rank` and
+percent-ranks the non-zero values within their sign class onto the matching
+side of the pin (negatives in [0, zero_rank], positives in [zero_rank, 1]),
+so the rank of the zero group is a fixed constant instead of the quarter's
+zero share; `none` emits no rank column at all (integer-valued composites,
+counts and shares, whose tied groups would each carry a quarter-specific
+constant).
 """
 
 from __future__ import annotations
 
 import duckdb
 
-from features.registry import FAMILIES, FEATURES, family_features
+from features.registry import FAMILIES, FEATURES, FeatureSpec, family_features
 
 from .source import family_view, key_meta_columns, label_matrix_columns
 
@@ -54,25 +64,58 @@ def feature_columns_in_order() -> tuple[str, ...]:
     )
 
 
-def numeric_feature_names() -> tuple[str, ...]:
-    return tuple(s.name for s in FEATURES if s.kind == "numeric")
+def ranked_features() -> tuple[FeatureSpec, ...]:
+    """Specs that get a `{name}_rank` column (rank policy other than none)."""
+    return tuple(s for s in FEATURES if s.ranked)
 
 
 def rank_columns() -> tuple[str, ...]:
-    return tuple(f"{name}_rank" for name in numeric_feature_names())
+    return tuple(f"{s.name}_rank" for s in ranked_features())
 
 
 def secrank_columns() -> tuple[str, ...]:
     return tuple(f"{s.name}_secrank" for s in FEATURES if s.sector_rank)
 
 
-def _rank_expr(col: str, partition: str, guard: int) -> str:
-    return (
-        f"CASE WHEN {col} IS NOT NULL"
+def rank_policy() -> dict[str, dict[str, object]]:
+    """Manifest view of the policy: every ranked feature's rank + pin."""
+    return {
+        s.name: (
+            {"rank": s.rank, "zero_rank": s.zero_rank}
+            if s.rank == "pinned_zero"
+            else {"rank": s.rank}
+        )
+        for s in ranked_features()
+    }
+
+
+def _rank_expr(spec: FeatureSpec, partition: str, guard: int) -> str:
+    """The rank SQL for one feature under its policy (module docstring)."""
+    col = spec.name
+    guarded = (
+        f"{col} IS NOT NULL"
         f" AND count({col}) OVER (PARTITION BY {partition}) >= {int(guard)}"
-        f" THEN percent_rank() OVER ("
-        f"PARTITION BY {partition}, {col} IS NULL ORDER BY {col}) END"
     )
+    if spec.rank == "full":
+        return (
+            f"CASE WHEN {guarded} THEN percent_rank() OVER ("
+            f"PARTITION BY {partition}, {col} IS NULL ORDER BY {col}) END"
+        )
+    if spec.rank == "pinned_zero":
+        # sign() partitions NULL / negative / zero / positive apart, so each
+        # sign class is percent-ranked on its own; zero's own rank is unused.
+        pr = (
+            f"percent_rank() OVER ("
+            f"PARTITION BY {partition}, sign({col}) ORDER BY {col})"
+        )
+        z = repr(float(spec.zero_rank))
+        return (
+            f"CASE WHEN {guarded} THEN CASE"
+            f" WHEN {col} = 0 THEN {z}"
+            f" WHEN {col} < 0 THEN {z} * {pr}"
+            f" ELSE {z} + (1 - {z}) * {pr} END END"
+        )
+    raise ValueError(f"{col}: rank policy {spec.rank!r} has no rank column")
 
 
 def build_wide_views(
@@ -136,12 +179,12 @@ def build_wide_views(
     # -- wide_r1: registry-driven ranks + sector ranks ------------------
     qk = "quarter, snapshot_kind"
     rank_selects = [
-        f"{_rank_expr(name, qk, rank_guard)} AS {name}_rank"
-        for name in numeric_feature_names()
-        if name != CONSERVATIVE
+        f"{_rank_expr(spec, qk, rank_guard)} AS {spec.name}_rank"
+        for spec in ranked_features()
+        if spec.name != CONSERVATIVE
     ] + [
         f"CASE WHEN sector IS NOT NULL THEN "
-        f"{_rank_expr(spec.name, qk + ', sector', rank_guard)} END"
+        f"{_rank_expr(spec, qk + ', sector', rank_guard)} END"
         f" AS {spec.name}_secrank"
         for spec in FEATURES
         if spec.sector_rank
@@ -163,10 +206,11 @@ def build_wide_views(
         FROM wide_r1
         """
     )
+    conservative = next(s for s in FEATURES if s.name == CONSERVATIVE)
     con.execute(
         f"""
         CREATE OR REPLACE TEMP VIEW wide_features AS
-        SELECT *, {_rank_expr(CONSERVATIVE, qk, rank_guard)}
+        SELECT *, {_rank_expr(conservative, qk, rank_guard)}
                       AS {CONSERVATIVE}_rank
         FROM wide_r2
         """

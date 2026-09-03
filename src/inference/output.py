@@ -22,6 +22,7 @@ from assemble.source import key_meta_columns
 from assemble.wide import (
     feature_columns_in_order,
     rank_columns,
+    rank_policy,
     secrank_columns,
 )
 from features.registry import FEATURES
@@ -111,6 +112,7 @@ def write_inference_dataset(
         "permatickers": int(permatickers),
         "rows_with_stale_price": int(stale),
         "columns": {group: list(cols) for group, cols in groups.items()},
+        "rank_policy": rank_policy(),
         "feature_versions": {
             spec.name: {
                 "added": spec.added_in_version,

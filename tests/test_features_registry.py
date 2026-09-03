@@ -1,7 +1,8 @@
 """The registry contract: src/features/registry.py is 1:1 with docs/features.md.
 
 Parses the markdown feature tables (one section per family) and compares
-names, order, depth tiers, sector-rank markers, and assembly-stage notes
+names, order, depth tiers, sector-rank markers, rank policy markers
+("not ranked" / "zero-pinned rank (z)", ADR 0016) and assembly-stage notes
 against the code registry.
 """
 
@@ -10,7 +11,9 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from features.registry import FAMILIES, FEATURES, family_features
+import pytest
+
+from features.registry import FAMILIES, FEATURES, FeatureSpec, family_features
 
 DOC_PATH = Path(__file__).resolve().parents[1] / "docs" / "features.md"
 
@@ -55,6 +58,13 @@ def parse_doc_rows() -> list[dict]:
         # merely starts with the letter (e.g. "S is not applied").
         sector = bool(re.match(r"S(;|$)", notes))
         assembly = "assembly-stage" in notes
+        pinned = re.search(r"zero-pinned rank \(([0-9.]+)\)", notes)
+        if "not ranked" in notes:
+            rank, zero_rank = "none", 0.0
+        elif pinned:
+            rank, zero_rank = "pinned_zero", float(pinned.group(1))
+        else:
+            rank, zero_rank = "full", 0.0
         for name in names:
             rows.append(
                 {
@@ -63,6 +73,8 @@ def parse_doc_rows() -> list[dict]:
                     "tier": tier,
                     "sector_rank": sector,
                     "assembly_stage": assembly,
+                    "rank": rank,
+                    "zero_rank": zero_rank,
                 }
             )
     return rows
@@ -87,12 +99,52 @@ def test_doc_and_registry_attributes_match():
         assert spec.tier == row["tier"], row["name"]
         assert spec.sector_rank == row["sector_rank"], row["name"]
         assert spec.assembly_stage == row["assembly_stage"], row["name"]
+        if spec.kind == "numeric":
+            assert spec.rank == row["rank"], row["name"]
+            assert spec.zero_rank == row["zero_rank"], row["name"]
 
 
 def test_flags_and_classification_are_never_ranked():
     for spec in FEATURES:
         if spec.kind in ("flag", "categorical", "metadata"):
+            assert spec.rank == "none", spec.name
             assert not spec.ranked and not spec.sector_rank, spec.name
+
+
+def test_rank_policy_adr_0016():
+    """Integer-valued composites, counts and shares are never ranked; the
+    documented mass-point features are zero-pinned with the documented pin."""
+    by_name = {s.name: s for s in FEATURES}
+    unranked = {
+        "fundamentals_age_days", "piotroski_f", "mohanram_g7",
+        "fund_history_quarters", "div_years_paid_10y", "div_streak_10y",
+        "div_cuts_10y", "div_history_years_10y",
+    } | {
+        f"{series}_up_frac_{w}q"
+        for series in ("revenue", "tangibles", "ocf")
+        for w in (4, 8, 12, 20)
+    } | {f"ocf_positive_frac_{w}q" for w in (4, 8, 12, 20)}
+    assert {s.name for s in FEATURES if s.kind == "numeric" and s.rank == "none"} == unranked
+
+    pinned = {
+        "sales_yield": 0.0, "dividend_yield": 0.0, "net_payout_yield": 0.5,
+        "asset_turnover": 0.0, "share_count_growth_1y": 0.5,
+        "debt_to_equity": 0.0, "ext_financing_to_assets": 0.5,
+        "rnd_to_assets": 0.0, "capex_to_assets": 0.0, "dist_52w_high": 1.0,
+    }
+    assert {s.name: s.zero_rank for s in FEATURES if s.rank == "pinned_zero"} == pinned
+    # Everything else numeric is a full percent rank.
+    for spec in FEATURES:
+        if spec.kind == "numeric" and spec.name not in unranked | set(pinned):
+            assert spec.rank == "full", spec.name
+    # A sector rank needs a rank policy; the spec constructor enforces it.
+    assert all(by_name[n].ranked for n in by_name if by_name[n].sector_rank)
+    with pytest.raises(ValueError):
+        FeatureSpec("x", "valuation", "T0", "numeric", "d", rank="none", sector_rank=True)
+    with pytest.raises(ValueError):
+        FeatureSpec("x", "meta", "T0", "flag", "d", rank="full")
+    with pytest.raises(ValueError):
+        FeatureSpec("x", "valuation", "T0", "numeric", "d", zero_rank=0.5)
 
 
 def test_sector_rank_allowlist_matches_adr_0008():

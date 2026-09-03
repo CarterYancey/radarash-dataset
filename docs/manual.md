@@ -14,11 +14,12 @@ this manual tells you how to *use* them together. Design rationale: PLAN.md.
 One versioned, immutable directory:
 
 ```
-dataset_v1.0/
+dataset_v1.2/
 ├── dataset.parquet       one row per snapshot: key, features, ranks, labels, weights
 ├── splits.parquet        role tags per (scheme, fold, horizon, snapshot)
 ├── split_folds.parquet   frozen fold manifest (boundaries + role counts)
-└── manifest.json         provenance: version, params, counts, column layout
+├── rank_audit.parquet    per rank column × kind: tie mass, quarter-key share (§3)
+└── manifest.json         provenance: version, params, counts, column layout, rank policy
 ```
 
 Pin the version. Never edit files inside it; if something is wrong or
@@ -45,7 +46,7 @@ the quarter's `low`, `median`, and `high` (decision 0001).
 |---|---|
 | `key_meta` | `permaticker`, `ticker`, `quarter`, `quarter_trading_days`, `snapshot_kind`, `snapshot_date`, `entry_closeadj` |
 | `features` | every registry feature ([features.md](features.md)), family build order, composites in place |
-| `ranks` | `{name}_rank` — percent rank within (calendar quarter, snapshot_kind) |
+| `ranks` | `{name}_rank` — percent rank within (calendar quarter, snapshot_kind), under the feature's rank policy (below) |
 | `sector_ranks` | `{name}_secrank` — same, additionally partitioned by sector (allowlist only) |
 | `labels` | per horizon H ∈ {1y, 2y, 3y, 5y}: `fwd_{H}_*` continuous outcomes, `label_{H}_*` binaries, `delisted_in_window_{H}` |
 | `sample_weights` | `sample_weight_{H}y` uniqueness weights |
@@ -55,10 +56,46 @@ Use the manifest to select feature columns — don't pattern-match names:
 ```python
 import json
 
-DATASET = "data/datasets/dataset_v1.0"
+DATASET = "data/datasets/dataset_v1.2"
 cols = json.load(open(f"{DATASET}/manifest.json"))["columns"]
 feature_cols = cols["features"] + cols["ranks"] + cols["sector_ranks"]
 ```
+
+### Ranks: what a rank value means (v1.2, decision 0016)
+
+A within-quarter percent rank of a *tied* group equals the share of the
+quarter's cross-section below it — a constant that identifies the quarter.
+On `dataset_v1.0` a tree model dated rows to the year with 0.95 accuracy
+from the rank columns alone, 0.92 from four of them
+(`research/rank-quarter-keys.md`). From v1.2 every feature carries a rank
+policy, published in `manifest.json["rank_policy"]`:
+
+- **Integer scores, counts and shares have no rank column** —
+  `piotroski_f`, `mohanram_g7`, `fundamentals_age_days`,
+  `fund_history_quarters`, the `div_*_10y` counters, `*_up_frac_*`,
+  `ocf_positive_frac_*`. Use the raw column; it is already comparable
+  across quarters. Do not rank them yourself within quarter — you would
+  rebuild the key.
+- **Zero-pinned ranks** (`{"rank": "pinned_zero", "zero_rank": z}`): exact
+  zeros rank *z* in every quarter; non-zero values are percent-ranked
+  within their sign class, negatives onto [0, z] and positives onto
+  [z, 1]. So `dividend_yield_rank = 0` means "no dividend, or the
+  smallest yield among payers", `dividend_yield_rank = 0.8` means "top
+  fifth of *payers*"; `net_payout_yield_rank` is 0.5 at zero, below for
+  net issuers, above for net payers; `dist_52w_high_rank = 1` means "at
+  its 52-week high".
+- **Full ranks** are the decision-0008 percent rank, unchanged.
+
+`rank_audit.parquet` (summarised in `manifest.json["rank_audit"]`) reports
+per rank column and kind the tie mass and the largest quarter-specific tied
+group (`max_key_share`); a shipped version has an empty
+`rank_audit.flagged` unless upstream published under `--allow-rank-keys`,
+in which case exclude the listed columns from rank-fed models.
+
+**v1.1 → v1.2 is a breaking boundary**: 24 rank columns disappear and ten
+change semantics. Do not compare rank-fed results across it; bump
+`min_dataset_version` on rank-fed configs. Raw columns and flags are
+unchanged.
 
 Every feature is point-in-time: it reflects only information publicly
 available on or before `snapshot_date`. Do not "enrich" rows by joining
@@ -183,7 +220,13 @@ task list:
   overlap leakage and firm-identity memorization. Diagnostic only.
 - **Era-identifiability probe** (same workspace): predict the calendar year
   from features alone (raw vs. rank sets); beating chance settles "you
-  can't tell what date a sample comes from" negatively.
+  can't tell what date a sample comes from" negatively. Run on v1.0, it
+  found the rank-column quarter key that decision 0016 removes; it is now
+  the **acceptance test for every new dataset version**: a `ranks`-only
+  probe under `entity_holdout` should land near the raw-feature level, not
+  0.9. Run it on receipt (`scripts/run_diagnostic.py era-probe`) before
+  the leakage-gap experiment, whose rank-model arm is only meaningful once
+  it passes.
 - **Restated-variant ablation** (decision 0009): as-reported features are
   canonical; a restated-dimension variant may be trained as a diagnostic
   under the same purged splits, never shipped.
@@ -202,9 +245,10 @@ From the committed reports under `research/reports/`:
   dominated by a few extreme returns). Winsorize or use the binary labels
   when a squared-error objective would chase outliers.
 - **Staleness is a feature, not a filter** (decision 0006):
-  `fundamentals_age_days` and the `has_filing_*`/freshness flags are
-  columns; stale rows have distinctly worse outcomes (staleness report), so
-  let the model see the flags rather than dropping rows.
+  `fundamentals_age_days` (raw days, unranked since v1.2) and the
+  `has_filing_*`/freshness flags are columns; stale rows have distinctly
+  worse outcomes (staleness report), so let the model see the flags rather
+  than dropping rows.
 - **Microcaps dominate the universe** and may not be investable. There is
   deliberately no liquidity floor; use `log_marketcap`,
   `dollar_volume_3m`, `amihud_12m` to build one downstream if the use case

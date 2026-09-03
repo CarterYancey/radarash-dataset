@@ -1,7 +1,10 @@
 # 0013 — Assembly-stage composites: Mohanram G7 mechanics + conservative score
 
 Date: 2026-07-18
-Status: accepted
+Status: accepted; the closing "ranked like any numeric feature" is amended
+by [0016](0016-rank-quarter-keys.md): `mohanram_g7` (an integer score) is
+no longer ranked, and `conservative_score` takes the zero-pinned
+`net_payout_yield_rank` as its third input (formula and range unchanged).
 
 ## Context
 

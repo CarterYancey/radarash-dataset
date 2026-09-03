@@ -1,7 +1,7 @@
 """CLI: assemble the versioned training dataset (M5).
 
-    sharadar-assemble                       # writes data/datasets/dataset_v1.0/
-    sharadar-assemble --dataset-version 1.1 --rank-guard 20
+    sharadar-assemble                       # writes data/datasets/dataset_v1.2/
+    sharadar-assemble --dataset-version 1.3 --rank-guard 20
 
 Inputs (produced by `sharadar-labels`, `sharadar-features`, `sharadar-splits`):
 
@@ -11,9 +11,11 @@ Inputs (produced by `sharadar-labels`, `sharadar-features`, `sharadar-splits`):
     data/interim/split_folds.parquet        fold manifest (copied verbatim)
 
 Produces data/datasets/dataset_v{VERSION}/ with dataset.parquet (features ×
-ranks × labels × uniqueness weights), the split files, and manifest.json.
-Dataset directories are immutable: an existing version is refused unless
---force is given.
+ranks × labels × uniqueness weights), the split files, rank_audit.parquet,
+and manifest.json. Dataset directories are immutable: an existing version
+is refused unless --force is given. The build fails (exit 1, directory
+removed) when a rank column carries a calendar-quarter key (decision 0016)
+unless --allow-rank-keys is given.
 """
 
 from __future__ import annotations
@@ -27,6 +29,7 @@ import duckdb
 
 from features.registry import FAMILIES
 
+from .audit import MAX_KEY_SHARE
 from .output import build_dataset_view, write_dataset
 from .source import (
     available_horizons,
@@ -38,7 +41,7 @@ from .wide import MIN_INDUSTRY_PEERS, RANK_GUARD, build_wide_views
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_VERSION = "1.1"
+DEFAULT_VERSION = "1.2"
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -72,6 +75,20 @@ def build_parser() -> argparse.ArgumentParser:
         default=MIN_INDUSTRY_PEERS,
         help="Minimum non-null famaindustry cross-section per G-score "
         f"median, ADR 0013 (default: {MIN_INDUSTRY_PEERS})",
+    )
+    parser.add_argument(
+        "--max-key-share",
+        type=float,
+        default=MAX_KEY_SHARE,
+        help="Rank audit gate, ADR 0016: fail when a quarter-specific tied "
+        "rank value is carried by more than this share of a (quarter, kind) "
+        f"cross-section (default: {MAX_KEY_SHARE})",
+    )
+    parser.add_argument(
+        "--allow-rank-keys",
+        action="store_true",
+        help="Publish even if the rank audit finds calendar-quarter keys "
+        "(they are recorded in manifest.json['rank_audit']['flagged'])",
     )
     parser.add_argument(
         "--force",
@@ -161,8 +178,11 @@ def main(argv: list[str] | None = None) -> int:
             params={
                 "rank_guard": args.rank_guard,
                 "min_industry_peers": args.min_industry_peers,
+                "max_key_share": args.max_key_share,
             },
             force=args.force,
+            max_key_share=args.max_key_share,
+            allow_rank_keys=args.allow_rank_keys,
         )
     except (FileExistsError, ValueError) as exc:
         logger.error("%s", exc)
