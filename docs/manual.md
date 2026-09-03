@@ -69,8 +69,10 @@ discipline — the easy joins (e.g. on `calendardate`) leak the future.
 
 Targets to choose from, per horizon (full definitions: [labels.md](labels.md)):
 
-- **Binary**: `label_{H}_cagr_ge_{0,5,8,10}` (inclusive thresholds) and
-  `label_{H}_beat_spy`.
+- **Binary**: `label_{H}_cagr_ge_{0,5,8,10,15,20}` (inclusive thresholds),
+  `label_{H}_beat_spy`, and `label_{H}_excess_ge_{5,10}` (beat SPY by ≥ 5 /
+  ≥ 10 pts CAGR — base rates are less era-dependent than the absolute
+  rungs; the 15/20/excess rungs first appear in datasets built after v1.1).
 - **Continuous**: `fwd_{H}_cagr` (terminal-month-average convention),
   `fwd_{H}_cagr_p2p`, `fwd_{H}_excess_cagr`, min/max variants. Custom
   thresholds can be re-derived from these without touching prices.

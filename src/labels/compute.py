@@ -27,7 +27,15 @@ from .paths import HORIZON_YEARS
 logger = logging.getLogger(__name__)
 
 # Binary-label thresholds on the terminal-month-average CAGR, in percent.
-CAGR_THRESHOLDS_PCT = (0, 5, 8, 10)
+# 15/20 target the right tail (compounders); the 0–10 band is the original
+# margin-of-safety ladder.
+CAGR_THRESHOLDS_PCT = (0, 5, 8, 10, 15, 20)
+
+# Binary-label thresholds on the excess CAGR vs. the benchmark, in percent.
+# `beat_spy` is the 0-point of this ladder (strict >); these add "beat the
+# market by a margin" targets whose base rates are less era-dependent than
+# absolute-CAGR thresholds.
+EXCESS_THRESHOLDS_PCT = (5, 10)
 
 NOT_DELISTED = "false"
 
@@ -37,11 +45,19 @@ def build_label_views(
     *,
     horizons: tuple[int, ...] = HORIZON_YEARS,
     thresholds_pct: tuple[int, ...] = CAGR_THRESHOLDS_PCT,
+    excess_thresholds_pct: tuple[int, ...] = EXCESS_THRESHOLDS_PCT,
 ) -> None:
     """Create `labels_long` (one row per snapshot × observable horizon) and
     `labels_wide` (one row per snapshot, horizon-suffixed columns)."""
     threshold_cols = ",\n               ".join(
-        f"fwd_cagr >= {pct / 100.0} AS cagr_ge_{pct}" for pct in thresholds_pct
+        [
+            f"fwd_cagr >= {pct / 100.0} AS cagr_ge_{pct}"
+            for pct in thresholds_pct
+        ]
+        + [
+            f"fwd_cagr - spy_cagr >= {pct / 100.0} AS excess_ge_{pct}"
+            for pct in excess_thresholds_pct
+        ]
     )
     con.execute(
         f"""
@@ -123,6 +139,10 @@ def build_label_views(
                 for pct in thresholds_pct
             ),
             f"any_value(l.beat_spy) {flt} AS label_{tag}_beat_spy",
+            *(
+                f"any_value(l.excess_ge_{pct}) {flt} AS label_{tag}_excess_ge_{pct}"
+                for pct in excess_thresholds_pct
+            ),
             f"any_value(l.delisted_in_window) {flt} AS delisted_in_window_{tag}",
         ]
         blocks.append(",\n               ".join(cols))

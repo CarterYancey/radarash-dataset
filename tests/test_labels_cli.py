@@ -242,6 +242,50 @@ def test_zigzag_delisting_convention(labels_world):
     assert (ge0, ge5, beat) == (True, False, False)
 
 
+def test_extended_threshold_labels(labels_world):
+    def zig_extended(kind: str):
+        return one_row(
+            labels_world,
+            "labels",
+            f"""
+            SELECT label_1y_cagr_ge_15, label_1y_cagr_ge_20,
+                   label_1y_excess_ge_5, label_1y_excess_ge_10
+            FROM {{t}} WHERE permaticker = 300003 AND snapshot_kind = '{kind}'
+            """,
+        )
+
+    # ZIG low: +200% CAGR, ~+192% excess — every rung clears.
+    assert zig_extended("low") == (True, True, True, True)
+    # ZIG median: exactly 0% CAGR, ~-7.7% excess — every rung fails.
+    assert zig_extended("median") == (False, False, False, False)
+
+    # GROW at 12%/yr vs SPY at 8%/yr: ~11.x% CAGR and ~3-5% excess, so
+    # ge_10 holds but ge_15/ge_20 and excess_ge_10 don't.
+    row = one_row(
+        labels_world,
+        "labels",
+        """
+        SELECT label_1y_cagr_ge_10, label_1y_cagr_ge_15, label_1y_cagr_ge_20,
+               label_1y_excess_ge_10
+        FROM {t} WHERE permaticker = 300001
+          AND snapshot_kind = 'median' AND quarter = DATE '2016-01-01'
+        """,
+    )
+    assert row == (True, False, False, False)
+
+    # Unobservable horizon: the new columns are NULL like the rest.
+    row = one_row(
+        labels_world,
+        "labels",
+        """
+        SELECT label_1y_cagr_ge_20, label_1y_excess_ge_5
+        FROM {t} WHERE permaticker = 300001
+          AND snapshot_kind = 'high' AND quarter = DATE '2021-10-01'
+        """,
+    )
+    assert row == (None, None)
+
+
 def test_terminal_price_columns(labels_world):
     # ZIG low snapshot: the whole terminal window is the frozen final close,
     # so every terminal price collapses to exactly 30.
