@@ -125,7 +125,13 @@ raw value AND **cross-sectional rank (percentile) within snapshot date**
 (and optionally within sector). Rank features are the primary model inputs;
 raw values are retained for analysis. Rationale: raw ratio thresholds are not
 stationary across valuation regimes; ranks are stationary by construction and
-neutralize outliers/units.
+neutralize outliers/units. Two exceptions, decided in
+`docs/decisions/0016`: integer-valued composites, counts and shares are
+stored raw only (a tied group's within-cross-section rank is the share of
+the cross-section below it — a date identifier), and features with a mass at
+exactly zero pin the zero group at a fixed rank and rank the non-zero support
+within its sign class. Assembly audits every rank column for such
+cross-section keys and refuses a build that carries one.
 
 Missing values are preserved as nulls (trees handle them; do not impute silently).
 Track per-feature null rates by sector as a data-quality report.

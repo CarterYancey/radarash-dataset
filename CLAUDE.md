@@ -47,7 +47,7 @@ src/identity/    tickers dedup (source.py), mapping, universe, year counts
 src/labels/      source views, snapshots, delistings, paths (stage 1), compute (stage 2), cli
 src/features/    registry.py (1:1 with docs/features.md), base (as-of + lags), history (quarterly/annual buckets), market, 9 family modules, output (registry-validated writer), cli
 src/splits/      fold calendar (folds.py), role tagging (tags.py), diagnostic schemes (diagnostics.py), cli — PLAN.md §7 + decisions 0010/0011 required reading
-src/assemble/    dataset assembly: registry-validated join (source.py), ranks+composites (wide.py, decisions 0008/0013), uniqueness weights (weights.py, decision 0012), versioned output (output.py), cli
+src/assemble/    dataset assembly: registry-validated join (source.py), ranks+composites (wide.py, decisions 0008/0013/0016), quarter-key rank audit (audit.py, decision 0016), uniqueness weights (weights.py, decision 0012), versioned output (output.py), cli
 src/inference/   label-free inference dataset (decision 0014): latest-price snapshots (snapshots.py), reuses the features builders + assemble rank pass, output, cli
 src/qa/          data-gated QA reports (sharadar-qa): coverage/null rates (F9), staleness×labels, DAILY PIT check (V7), splits diagnostics (§7.7)
 tests/           synthetic-fixture tests; conftest.py has shared TICKERS fixtures

@@ -267,8 +267,9 @@ def test_ranks_over_the_inference_cross_section(inference_world):
 
 def test_conservative_score(inference_world):
     # Constant prices: vol_36m and mom_12_2 rank 0 everywhere. Net payout
-    # yield 0.01 / 0.02 / 0.03 -> ranks 0 / 0.5 / 1 ->
-    # conservative = 1 + npy_rank, ranked 0 / 0.5 / 1.
+    # yield 0.01 / 0.02 / 0.03 is pinned at 0 -> 0.5 (ADR 0016, same policy
+    # as training) -> 0.5 / 0.75 / 1 -> conservative = 1 + npy_rank,
+    # ranked 0 / 0.5 / 1.
     assert query(
         inference_world,
         """
@@ -276,10 +277,35 @@ def test_conservative_score(inference_world):
         FROM {t} ORDER BY permaticker
         """,
     ) == [
-        (pytest.approx(0.01), pytest.approx(1.0), pytest.approx(0.0)),
-        (pytest.approx(0.02), pytest.approx(1.5), pytest.approx(0.5)),
+        (pytest.approx(0.01), pytest.approx(1.5), pytest.approx(0.0)),
+        (pytest.approx(0.02), pytest.approx(1.75), pytest.approx(0.5)),
         (pytest.approx(0.03), pytest.approx(2.0), pytest.approx(1.0)),
     ]
+
+
+def test_rank_policy_matches_training(inference_world):
+    # ADR 0016 applies verbatim: the pinned zero group, and no rank column
+    # for the integer composites.
+    assert query(
+        inference_world,
+        """
+        SELECT permaticker, dividend_yield, dividend_yield_rank,
+               dist_52w_high_rank
+        FROM {t} ORDER BY permaticker
+        """,
+    ) == [
+        (500001, pytest.approx(0.01), pytest.approx(0.0), pytest.approx(1.0)),
+        (500002, pytest.approx(0.02), pytest.approx(1.0), pytest.approx(1.0)),
+        (500003, pytest.approx(0.0), pytest.approx(0.0), pytest.approx(1.0)),
+    ]
+    emitted = {
+        r[0]
+        for r in duckdb.sql(
+            f"DESCRIBE SELECT * FROM '{dataset_path(inference_world)}'"
+        ).fetchall()
+    }
+    assert {"piotroski_f", "mohanram_g7"} <= emitted
+    assert not {"piotroski_f_rank", "mohanram_g7_rank"} & emitted
 
 
 def test_manifest(inference_world):
@@ -295,6 +321,9 @@ def test_manifest(inference_world):
     assert manifest["permatickers"] == 3
     assert manifest["rows_with_stale_price"] == 1  # MTWO
     assert manifest["columns"]["features"] == list(feature_columns_in_order())
+    assert manifest["rank_policy"]["dividend_yield"] == {
+        "rank": "pinned", "pin_value": 0.0, "pin_rank": 0.0,
+    }
     assert "labels" not in manifest["columns"]
     assert set(manifest["input_rows"]) == {"SF1", "SEP", "mapping", "universe"}
 
