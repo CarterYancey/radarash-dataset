@@ -8,7 +8,8 @@ The measurements were made on `dataset_v1.0` (the column classes named
 apply to v1.1 as well); the probe code lives downstream in
 `value-ml-models/src/diagnostics/` (branch `claude/era-identifiability-probe`).
 Upstream's response — what changed in v1.2 and why the mass-point policy was
-generalised to signed supports — is in the ADR, not here.
+generalised to signed supports and to masses away from zero — is in the ADR,
+not here.
 
 ---
 
@@ -250,7 +251,7 @@ recorded here because they differ from the brief's wording:
   group whose rank value occurs in only one quarter, as a share of its
   cross-section. (`fundamentals_age_days` is nevertheless unranked in v1.2
   under the integer-count rule of §6.1.)
-- **"Keyed" is defined by recurrence across quarters**, so the zero-pinned
+- **"Keyed" is defined by recurrence across quarters**, so the pinned
   groups of decision 0016 (tied in every quarter, always at the same value)
   and the bottom group's 0.0 of a full rank are tied but not keyed — the
   same distinction §5 draws for the 1044 vs. 1160 count.

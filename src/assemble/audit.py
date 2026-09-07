@@ -20,6 +20,12 @@ column and snapshot kind:
     max_key_share     the largest keyed tie group as a share of its
                       (quarter, kind) cross-section — the size of the
                       heaviest single quarter constant the column emits
+    key_quarter / key_rank_value / key_raw_value
+                      where that largest keyed group sits: its quarter, the
+                      rank value it shares, and the raw feature value behind
+                      it — the raw value is what a registry fix needs (the
+                      `pin_value` of a `pinned` policy, or `none` for an
+                      integer-valued feature)
     distinct_values / distinct_quarter_value_pairs / quarters
                       the pair count of the brief: ten integer scores over
                       116 quarters give ~1160 pairs and ~1044 values
@@ -28,9 +34,9 @@ The gate is `max_key_share`, not `tie_mass`: an integer-valued but
 fine-grained column (e.g. days of filing age, hundreds of values per quarter
 in groups of a few rows) ties almost every row, yet its constants are too
 light and too numerous for histogram binning to resolve. A group holding a
-few percent of a cross-section is a resolvable constant. Zero-pinned ranks
-(decision 0016) put the zero group at the same value in every quarter, so
-it is tied but never keyed.
+few percent of a cross-section is a resolvable constant. Pinned ranks
+(decision 0016) put the mass at the same value in every quarter, so it is
+tied but never keyed.
 """
 
 from __future__ import annotations
@@ -60,7 +66,18 @@ AUDIT_COLUMNS: tuple[str, ...] = (
     "tie_mass",
     "keyed_mass",
     "max_key_share",
+    "key_quarter",
+    "key_rank_value",
+    "key_raw_value",
 )
+
+
+def raw_column(rank_column: str) -> str:
+    """`{name}_rank` / `{name}_secrank` -> `{name}`."""
+    for suffix in ("_secrank", "_rank"):
+        if rank_column.endswith(suffix):
+            return rank_column[: -len(suffix)]
+    raise ValueError(f"{rank_column!r} is not a rank column")
 
 
 def build_rank_audit_table(
@@ -85,17 +102,22 @@ def build_rank_audit_table(
             distinct_quarter_value_pairs BIGINT,
             tie_mass DOUBLE,
             keyed_mass DOUBLE,
-            max_key_share DOUBLE
+            max_key_share DOUBLE,
+            key_quarter DATE,
+            key_rank_value DOUBLE,
+            key_raw_value DOUBLE
         )
         """
     )
     src = sql_quote(str(dataset_parquet))
     for col in columns:
+        raw = raw_column(col)
         con.execute(
             f"""
             INSERT INTO {AUDIT_TABLE}
             WITH g AS (
-                SELECT snapshot_kind, quarter, {col} AS v, count(*) AS n
+                SELECT snapshot_kind, quarter, {col} AS v, count(*) AS n,
+                       min({raw}) AS raw_v
                 FROM read_parquet({src})
                 WHERE {col} IS NOT NULL
                 GROUP BY ALL
@@ -119,7 +141,16 @@ def build_rank_audit_table(
                        / sum(g.n) AS keyed_mass,
                    coalesce(max(g.n::DOUBLE / q.n_q)
                             FILTER (WHERE g.n >= 2 AND vq.n_quarters = 1), 0)
-                       AS max_key_share
+                       AS max_key_share,
+                   CAST(arg_max(g.quarter, g.n::DOUBLE / q.n_q)
+                        FILTER (WHERE g.n >= 2 AND vq.n_quarters = 1) AS DATE)
+                       AS key_quarter,
+                   arg_max(g.v, g.n::DOUBLE / q.n_q)
+                        FILTER (WHERE g.n >= 2 AND vq.n_quarters = 1)
+                       AS key_rank_value,
+                   arg_max(g.raw_v, g.n::DOUBLE / q.n_q)
+                        FILTER (WHERE g.n >= 2 AND vq.n_quarters = 1)
+                       AS key_raw_value
             FROM g
             JOIN q USING (snapshot_kind, quarter)
             JOIN vq USING (snapshot_kind, v)
@@ -130,10 +161,17 @@ def build_rank_audit_table(
 
 
 def write_rank_audit(con: duckdb.DuckDBPyConnection, path: Path) -> None:
+    """COPY the audit table to `path` (parquet, or CSV for a .csv path)."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fmt = (
+        "FORMAT CSV, HEADER"
+        if path.suffix == ".csv"
+        else "FORMAT PARQUET, COMPRESSION ZSTD"
+    )
     con.execute(
         f"""
         COPY (SELECT * FROM {AUDIT_TABLE} ORDER BY rank_column, snapshot_kind)
-        TO {sql_quote(str(path))} (FORMAT PARQUET, COMPRESSION ZSTD)
+        TO {sql_quote(str(path))} ({fmt})
         """
     )
 
@@ -172,37 +210,52 @@ def rank_audit_summary(
 
 def flagged_detail(
     con: duckdb.DuckDBPyConnection, *, max_key_share: float
-) -> list[tuple[str, str, float]]:
-    """(rank column, kind, max_key_share) for every failing audit row,
-    worst first — the log/error detail."""
-    return [
-        (col, kind, float(share))
-        for col, kind, share in con.execute(
-            f"""
-            SELECT rank_column, snapshot_kind, max_key_share
-            FROM {AUDIT_TABLE}
-            WHERE max_key_share > ?
-            ORDER BY max_key_share DESC, rank_column, snapshot_kind
-            """,
-            [max_key_share],
-        ).fetchall()
-    ]
+) -> list[tuple]:
+    """One row per failing (rank column, kind), worst first:
+    (rank_column, snapshot_kind, max_key_share, key_quarter,
+    key_rank_value, key_raw_value) — the log/error detail."""
+    return con.execute(
+        f"""
+        SELECT rank_column, snapshot_kind, max_key_share,
+               key_quarter, key_rank_value, key_raw_value
+        FROM {AUDIT_TABLE}
+        WHERE max_key_share > ?
+        ORDER BY max_key_share DESC, rank_column, snapshot_kind
+        """,
+        [max_key_share],
+    ).fetchall()
 
 
-def rank_key_error(
-    detail: list[tuple[str, str, float]], *, max_key_share: float
-) -> str:
-    worst = ", ".join(
-        f"{col} ({kind} {share:.3f})" for col, kind, share in detail[:8]
-    )
-    more = f", … {len(detail) - 8} more" if len(detail) > 8 else ""
+def describe_flagged(detail: list[tuple]) -> list[str]:
+    """One line per flagged rank column (worst kind), e.g.
+    `gp_to_assets_rank: 19.3% of median 2009-Q2 share rank 0.412 at raw
+    value 0` — the raw value says which registry fix applies."""
+    lines: list[str] = []
+    seen: set[str] = set()
+    for col, kind, share, quarter, rank_v, raw_v in detail:
+        if col in seen:
+            continue
+        seen.add(col)
+        q = f"{quarter.year}-Q{(quarter.month - 1) // 3 + 1}" if quarter else "?"
+        lines.append(
+            f"{col}: {share:.1%} of {kind} {q} share rank {rank_v:.3f} "
+            f"at raw value {raw_v:g}"
+        )
+    return lines
+
+
+def rank_key_error(detail: list[tuple], *, max_key_share: float) -> str:
+    lines = describe_flagged(detail)
     return (
-        f"rank audit: {len({c for c, _, _ in detail})} rank column(s) carry a "
-        f"calendar-quarter key — a quarter-specific tied rank value held by "
-        f"more than {max_key_share:.0%} of a cross-section: {worst}{more}. "
-        f"The dataset directory was not kept. Fix the feature's rank policy in "
-        f"src/features/registry.py ('pinned_zero' for a mass point at zero, "
-        f"'none' for integer-valued scores/counts; decision 0016) and rebuild, "
-        f"or pass --allow-rank-keys to publish anyway (the keyed columns are "
-        f"then listed in manifest.json['rank_audit']['flagged'])"
+        f"rank audit: {len(lines)} rank column(s) carry a calendar-quarter "
+        f"key — a quarter-specific tied rank value held by more than "
+        f"{max_key_share:.0%} of a cross-section (worst kind per column):\n  "
+        + "\n  ".join(lines)
+        + "\nThe dataset directory was not kept. Fix each feature's rank "
+        f"policy in src/features/registry.py — a mass at one raw value ⇒ "
+        f"rank='pinned' with pin_value = that value and pin_rank 0 / 0.5 / 1 "
+        f"for a support above / around / below it, an integer-valued feature "
+        f"⇒ rank='none' (decision 0016) — and rebuild; or pass "
+        f"--allow-rank-keys to publish anyway (the keyed columns are then "
+        f"listed in manifest.json['rank_audit']['flagged'])"
     )

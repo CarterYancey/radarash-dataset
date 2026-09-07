@@ -70,7 +70,7 @@ era-identifiability probe) live on its task list, not here.
 - [x] **M5 — Assembly.** Rank columns leaked the calendar quarter (the
       downstream era probe dated rows at 0.95 from ranks alone: tied groups
       rank at the quarter's below-share). Per-feature rank policy — no
-      ranks for integer scores/counts/shares, zero-pinned ranks for
+      ranks for integer scores/counts/shares, pinned ranks for
       mass-point features — plus a build-time quarter-key audit that fails
       the build → `docs/decisions/0016`, brief archived in
       `docs/research/rank-quarter-keys.md`; dataset version **1.2**

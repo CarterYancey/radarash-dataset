@@ -31,6 +31,7 @@ import duckdb
 import pytest
 
 from assemble import cli as assemble_cli
+from assemble.audit import AUDIT_COLUMNS
 from assemble.wide import feature_columns_in_order, rank_columns, secrank_columns
 from features import cli as features_cli
 from features.registry import FEATURES
@@ -368,7 +369,7 @@ def test_mohanram_g7_hand_check(assembled_world):
 
 def test_conservative_score_hand_check(assembled_world):
     # Constant prices: vol_36m and mom_12_2 tie at 0 -> both ranks 0 for
-    # everyone. Net payout yield 0.01/0.02/0.03 is zero-pinned at 0.5
+    # everyone. Net payout yield 0.01/0.02/0.03 is pinned at 0 -> 0.5
     # (ADR 0016), all three positive -> 0.5 + 0.5 * {0, 0.5, 1} =
     # 0.5/0.75/1. conservative = (1 - 0) + 0 + npy_rank.
     rows = machinery(
@@ -391,9 +392,9 @@ def test_conservative_score_hand_check(assembled_world):
     ) == (None,)
 
 
-def test_zero_pinned_ranks(assembled_world):
-    """ADR 0016 pinned_zero: exact zeros sit at the pin in every quarter;
-    the non-zero support is percent-ranked on the pin's far side."""
+def test_pinned_ranks(assembled_world):
+    """ADR 0016 pinned: rows at the pin value sit at the pin rank in every
+    quarter; the rest are percent-ranked on their side of the pin."""
     # dividend_yield (pin 0): MTHR pays nothing -> 0.0; MONE 0.01 and MTWO
     # 0.02 are the payers -> ranked among themselves 0/1 -> 0.0 + 1.0 * pr.
     # The smallest payer therefore shares the pin with the non-payers.
@@ -421,8 +422,29 @@ def test_zero_pinned_ranks(assembled_world):
         assembled_world, "dist_52w_high, dist_52w_high_rank", "2017-04-03"
     )
     assert rows == [(pytest.approx(0.0), pytest.approx(1.0))] * 3
-    # The pin is a fixed constant across quarters: the zero group's rank
-    # never equals the quarter's zero share.
+    # gross_margin (pin at raw 1 -> rank 1): gp 200 / revenue 1000, 8000,
+    # 990 -> 0.2, 0.025, 0.202..; all below the pin -> 1.0 * pr = 0.5/0/1.
+    rows = machinery(
+        assembled_world, "gross_margin, gross_margin_rank", "2017-04-03"
+    )
+    assert rows == [
+        (pytest.approx(0.2), pytest.approx(0.5)),
+        (pytest.approx(0.025), pytest.approx(0.0)),
+        (pytest.approx(200 / 990), pytest.approx(1.0)),
+    ]
+    # ev_to_marketcap (pin at raw 1 -> rank 0.5): ev = marketcap + 250 - 100
+    # everywhere -> all above 1 -> 0.5 + 0.5 * pr; marketcap 1000/2000/4000
+    # -> ratios 1.15, 1.075, 1.0375 -> pr 1, 0.5, 0 -> 1.0, 0.75, 0.5.
+    rows = machinery(
+        assembled_world, "ev_to_marketcap, ev_to_marketcap_rank", "2017-04-03"
+    )
+    assert rows == [
+        (pytest.approx(1.15), pytest.approx(1.0)),
+        (pytest.approx(1.075), pytest.approx(0.75)),
+        (pytest.approx(1.0375), pytest.approx(0.5)),
+    ]
+    # The pin is a fixed constant across quarters: the mass's rank never
+    # equals the quarter's share below it.
     assert query(
         assembled_world,
         """
@@ -467,6 +489,11 @@ def test_rank_audit(assembled_world):
             "1.2-audit", "--rank-guard", "3", "--min-industry-peers", "3"]
     assert assemble_cli.main(args) == 1
     assert not (assembled_world / "datasets" / "dataset_v1.2-audit").exists()
+    # …but the audit table is kept for inspection, in both formats.
+    kept = assembled_world / "interim" / "qa"
+    assert (kept / "rank_audit_v1.2-audit.parquet").exists()
+    csv_head = (kept / "rank_audit_v1.2-audit.csv").read_text().splitlines()[0]
+    assert csv_head.split(",") == list(AUDIT_COLUMNS)
 
     cursor = duckdb.sql(
         f"SELECT * FROM '{dataset_dir(assembled_world) / 'rank_audit.parquet'}'"
@@ -493,6 +520,13 @@ def test_rank_audit(assembled_world):
     assert row.tie_mass == pytest.approx(8 / 70)
     assert row.keyed_mass == pytest.approx(2 / 70)
     assert row.max_key_share == pytest.approx(0.5)
+    # …and it says where: 2016-Q1, rank 2/3, raw sales yield 1.0 (MONE and
+    # MTWO both at revenue = marketcap) — the value a registry fix needs.
+    assert row.key_quarter == date(2016, 1, 1)
+    assert row.key_rank_value == pytest.approx(2 / 3)
+    assert row.key_raw_value == pytest.approx(1.0)
+    # An unkeyed column has no key location.
+    assert audit[("vol_36m_rank", "median")].key_quarter is None
 
     # vol_36m_rank: constant prices tie every stock at 0 in every quarter,
     # so tie_mass is 1 — but 0.0 recurs in every quarter, so nothing is
@@ -529,9 +563,15 @@ def test_rank_audit(assembled_world):
     assert {"sales_yield_rank", "sales_yield_secrank", "vol_36m_rank",
             "conservative_score_rank"} <= audited
     policy = manifest["rank_policy"]
-    assert policy["dividend_yield"] == {"rank": "pinned_zero", "zero_rank": 0.0}
-    assert policy["net_payout_yield"] == {"rank": "pinned_zero", "zero_rank": 0.5}
-    assert policy["dist_52w_high"] == {"rank": "pinned_zero", "zero_rank": 1.0}
+
+    def pinned(value, rank):
+        return {"rank": "pinned", "pin_value": value, "pin_rank": rank}
+
+    assert policy["dividend_yield"] == pinned(0.0, 0.0)
+    assert policy["net_payout_yield"] == pinned(0.0, 0.5)
+    assert policy["dist_52w_high"] == pinned(0.0, 1.0)
+    assert policy["gross_margin"] == pinned(1.0, 1.0)
+    assert policy["ev_to_marketcap"] == pinned(1.0, 0.5)
     assert policy["earnings_yield"] == {"rank": "full"}
     assert "piotroski_f" not in policy and "mohanram_g7" not in policy
 

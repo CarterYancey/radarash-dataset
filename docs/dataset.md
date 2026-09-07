@@ -49,13 +49,17 @@ docs/features.md notes):
 | policy | columns emitted | rule |
 |---|---|---|
 | `full` | `_rank` (+ `_secrank` if allowlisted) | the percent rank above; continuous features |
-| `pinned_zero` (pin *z*) | same | exact zeros rank *z* in every quarter; non-zero values are percent-ranked within their sign class, negatives onto [0, *z*], positives onto [*z*, 1] — the zero group's rank is a fixed constant, not the quarter's zero share |
+| `pinned` (mass at raw *v*, rank *r*) | same | rows at exactly *v* rank *r* in every quarter; the rest are percent-ranked within their side of the pin, below onto [0, *r*], above onto [*r*, 1] — the mass's rank is a fixed constant, not the quarter's share below it |
 | `none` | no rank columns | integer-valued composites, counts and shares (`piotroski_f`, `mohanram_g7`, `fundamentals_age_days`, `fund_history_quarters`, `div_*_10y`, `*_up_frac_*`, `ocf_positive_frac_*`): the raw score is already cross-sectionally comparable |
 
-Pins in v1.2: 0 for `dividend_yield`, `rnd_to_assets`, `capex_to_assets`,
-`debt_to_equity`, `sales_yield`, `asset_turnover`; 0.5 for the signed
-`net_payout_yield`, `ext_financing_to_assets`, `share_count_growth_1y`;
-1 for `dist_52w_high` (≤ 0, zero = at the 52-week high).
+Pins in v1.2 (mass at raw 0 unless stated): rank 0 for `dividend_yield`,
+`rnd_to_assets`, `capex_to_assets`, `debt_to_equity`, `sales_yield`,
+`asset_turnover`; rank 0.5 for the signed `net_payout_yield`,
+`ext_financing_to_assets`, `share_count_growth_1y`, `gp_to_assets`,
+`asset_turnover_delta_1y`, `gross_margin_delta_1y`, `gross_margin_delta_2y`,
+`ni_change_scaled`, `ret_1m`; rank 1 for `dist_52w_high` (≤ 0, zero = at
+the 52-week high); mass at raw **1**: `gross_margin` (rank 1 — no cost of
+revenue reported), `gmi` and `ev_to_marketcap` (rank 0.5).
 
 ### Rank audit (ADR 0016)
 
@@ -63,16 +67,21 @@ After `dataset.parquet` is written, every rank and sector-rank column is
 measured per snapshot kind on the parquet and the table is written to
 `rank_audit.parquet` (`rank_column`, `snapshot_kind`, `n_rows`, `quarters`,
 `distinct_values`, `distinct_quarter_value_pairs`, `tie_mass`, `keyed_mass`,
-`max_key_share`). `tie_mass` = share of rows whose rank value is shared
+`max_key_share`, `key_quarter`, `key_rank_value`, `key_raw_value`).
+`tie_mass` = share of rows whose rank value is shared
 with another row of the same (quarter, kind); `keyed_mass` = share of rows
 in tie groups whose value occurs in exactly one quarter; `max_key_share` =
-the largest such keyed group as a share of its cross-section. The build
-**fails and removes the directory** when any `max_key_share` exceeds
-`--max-key-share` (default 0.02), naming the columns; `--allow-rank-keys`
-publishes anyway and lists them in `manifest.json["rank_audit"]["flagged"]`.
+the largest such keyed group as a share of its cross-section, and the
+`key_*` columns locate it (its quarter, the rank value it shares, and the
+raw feature value behind it — the raw value decides the registry fix). The
+build **fails and removes the directory** when any `max_key_share` exceeds
+`--max-key-share` (default 0.02), naming each column with its worst group,
+and keeps the audit table as `data/interim/qa/rank_audit_v{version}.{parquet,csv}`;
+`--allow-rank-keys` publishes anyway and lists them in
+`manifest.json["rank_audit"]["flagged"]`.
 The gate is `max_key_share`, not `tie_mass`: fine-grained integer columns
 tie nearly every row without emitting a resolvable constant, while a
-zero-pinned group is tied in every quarter but never keyed.
+pinned mass is tied in every quarter but never keyed.
 
 ### Assembly-stage composites (ADR 0013)
 
@@ -81,7 +90,7 @@ zero-pinned group is tied in every quarter but never keyed.
   (default 5) non-NULL values; any NULL signal ⇒ NULL. Sits in the quality
   family's column block.
 - `conservative_score` — `(1 − vol_36m_rank) + mom_12_2_rank +
-  net_payout_yield_rank` (the last zero-pinned at 0.5, ADR 0016), range
+  net_payout_yield_rank` (the last pinned at 0 → 0.5, ADR 0016), range
   [0, 3]; NULL if any input rank is NULL. Sits in the technical family's
   column block and is ranked (`full`); `mohanram_g7` is an integer score and
   is not ranked (ADR 0016).
@@ -107,7 +116,7 @@ in the manifest.
 | `rows`, `permatickers` | dataset size |
 | `effective_rows` | Σ `sample_weight_{H}y` per horizon |
 | `columns` | the full column layout by group, in order |
-| `rank_policy` | per ranked feature: `{"rank": "full"}` or `{"rank": "pinned_zero", "zero_rank": z}` (ADR 0016); unranked numerics are absent |
+| `rank_policy` | per ranked feature: `{"rank": "full"}` or `{"rank": "pinned", "pin_value": v, "pin_rank": r}` (ADR 0016); unranked numerics are absent |
 | `rank_audit` | `max_key_share_threshold`, `flagged` (rank column → worst `max_key_share` over kinds, empty on a clean build), `columns` (per rank column: worst `tie_mass`, `keyed_mass`, `max_key_share` over kinds) |
 | `feature_versions` | per-feature `added`/`removed` version from the registry |
 | `input_rows` | row counts of every input parquet at build time |

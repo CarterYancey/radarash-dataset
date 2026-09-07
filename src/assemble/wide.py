@@ -17,13 +17,13 @@ non-NULL values only, NULL raw ⇒ NULL rank, cross-sections with fewer than
 `rank_guard` non-NULL values ⇒ NULL rank.
 
 Per-feature policy (decision 0016, `FeatureSpec.rank`): `full` is the rule
-above; `pinned_zero` pins exact zeros at the spec's `zero_rank` and
-percent-ranks the non-zero values within their sign class onto the matching
-side of the pin (negatives in [0, zero_rank], positives in [zero_rank, 1]),
-so the rank of the zero group is a fixed constant instead of the quarter's
-zero share; `none` emits no rank column at all (integer-valued composites,
-counts and shares, whose tied groups would each carry a quarter-specific
-constant).
+above; `pinned` gives rows at exactly `pin_value` (the mass, usually 0) the
+fixed rank `pin_rank` and percent-ranks the rest within their side of the
+pin onto the matching interval (below in [0, pin_rank], above in
+[pin_rank, 1]), so the mass's rank is a constant instead of the quarter's
+share below it; `none` emits no rank column at all (integer-valued
+composites, counts and shares, whose tied groups would each carry a
+quarter-specific constant).
 """
 
 from __future__ import annotations
@@ -81,8 +81,8 @@ def rank_policy() -> dict[str, dict[str, object]]:
     """Manifest view of the policy: every ranked feature's rank + pin."""
     return {
         s.name: (
-            {"rank": s.rank, "zero_rank": s.zero_rank}
-            if s.rank == "pinned_zero"
+            {"rank": s.rank, "pin_value": s.pin_value, "pin_rank": s.pin_rank}
+            if s.rank == "pinned"
             else {"rank": s.rank}
         )
         for s in ranked_features()
@@ -101,19 +101,21 @@ def _rank_expr(spec: FeatureSpec, partition: str, guard: int) -> str:
             f"CASE WHEN {guarded} THEN percent_rank() OVER ("
             f"PARTITION BY {partition}, {col} IS NULL ORDER BY {col}) END"
         )
-    if spec.rank == "pinned_zero":
-        # sign() partitions NULL / negative / zero / positive apart, so each
-        # sign class is percent-ranked on its own; zero's own rank is unused.
+    if spec.rank == "pinned":
+        # sign(col - pin) partitions NULL / below / at / above the pin apart,
+        # so each side is percent-ranked on its own; the pin's own rank is
+        # unused.
+        v = repr(float(spec.pin_value))
         pr = (
             f"percent_rank() OVER ("
-            f"PARTITION BY {partition}, sign({col}) ORDER BY {col})"
+            f"PARTITION BY {partition}, sign({col} - {v}) ORDER BY {col})"
         )
-        z = repr(float(spec.zero_rank))
+        r = repr(float(spec.pin_rank))
         return (
             f"CASE WHEN {guarded} THEN CASE"
-            f" WHEN {col} = 0 THEN {z}"
-            f" WHEN {col} < 0 THEN {z} * {pr}"
-            f" ELSE {z} + (1 - {z}) * {pr} END END"
+            f" WHEN {col} = {v} THEN {r}"
+            f" WHEN {col} < {v} THEN {r} * {pr}"
+            f" ELSE {r} + (1 - {r}) * {pr} END END"
         )
     raise ValueError(f"{col}: rank policy {spec.rank!r} has no rank column")
 

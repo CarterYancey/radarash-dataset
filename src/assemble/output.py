@@ -30,6 +30,7 @@ from identity.source import sql_quote
 from .audit import (
     MAX_KEY_SHARE,
     build_rank_audit_table,
+    describe_flagged,
     flagged_detail,
     rank_audit_summary,
     rank_key_error,
@@ -100,11 +101,14 @@ def write_dataset(
     force: bool = False,
     max_key_share: float = MAX_KEY_SHARE,
     allow_rank_keys: bool = False,
+    audit_keep_dir: Path | None = None,
 ) -> Path:
     """Write data/datasets/dataset_v{version}/; return the directory.
 
     Raises ValueError (after removing the directory) when a rank column
-    fails the quarter-key audit and `allow_rank_keys` is False."""
+    fails the quarter-key audit and `allow_rank_keys` is False; the audit
+    table is then kept as `{audit_keep_dir}/rank_audit_v{version}.{parquet,
+    csv}` (when given) so the failure can be inspected without a rebuild."""
     out_dir = datasets_dir / f"dataset_v{version}"
     if out_dir.exists():
         if not force:
@@ -138,12 +142,14 @@ def write_dataset(
     audit = rank_audit_summary(con, max_key_share=max_key_share)
     detail = flagged_detail(con, max_key_share=max_key_share)
     if detail:
-        for col, kind, share in detail:
-            logger.warning(
-                "rank audit: %s (%s) max quarter-key share %.3f > %.3f",
-                col, kind, share, max_key_share,
-            )
+        for line in describe_flagged(detail):
+            logger.warning("rank audit: %s", line)
         if not allow_rank_keys:
+            if audit_keep_dir is not None:
+                for suffix in (".parquet", ".csv"):
+                    kept = audit_keep_dir / f"rank_audit_v{version}{suffix}"
+                    write_rank_audit(con, kept)
+                    logger.error("rank audit table kept at %s", kept)
             shutil.rmtree(out_dir)
             raise ValueError(rank_key_error(detail, max_key_share=max_key_share))
         logger.warning(

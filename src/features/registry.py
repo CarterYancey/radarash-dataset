@@ -36,17 +36,16 @@ KINDS = ("numeric", "flag", "categorical", "metadata")
 # Rank policy of a numeric feature (ADR 0016; mechanics in assemble/wide.py):
 #   full         percent_rank over every non-NULL value of the cross-section
 #                (ADR 0008) — continuous features only.
-#   pinned_zero  exact zeros are pinned at `zero_rank`; non-zero values are
-#                percent-ranked within their sign class and mapped onto the
-#                side of the pin (negatives below, positives above). For
-#                features with a probability mass at zero: a within-quarter
-#                rank of the zero group would equal the quarter's zero share,
-#                a quarter identifier.
+#   pinned       rows at exactly `pin_value` (a probability mass, usually 0)
+#                take the fixed rank `pin_rank`; the rest are percent-ranked
+#                within their side of the pin and mapped below / above it.
+#                A within-quarter rank of the mass would equal the quarter's
+#                share below it — a quarter identifier.
 #   none         no rank column. Integer-valued composites, counts and
 #                shares: each tied score group's percent rank is a
 #                quarter-specific constant, so the raw score — already
 #                cross-sectionally comparable — is shipped alone.
-RANK_POLICIES = ("full", "pinned_zero", "none")
+RANK_POLICIES = ("full", "pinned", "none")
 
 
 @dataclass(frozen=True)
@@ -59,7 +58,8 @@ class FeatureSpec:
     kind: str
     definition: str
     rank: str = "full"  # one of RANK_POLICIES; forced to "none" for non-numeric kinds
-    zero_rank: float = 0.0  # pinned_zero only: rank of the zero group (0.0 / 0.5 / 1.0)
+    pin_value: float = 0.0  # pinned only: the raw value carrying the mass
+    pin_rank: float = 0.0  # pinned only: rank of that mass (0.0 / 0.5 / 1.0)
     sector_rank: bool = False  # "S" in docs/features.md (ADR 0008 allowlist)
     assembly_stage: bool = False  # computed at assembly (M5), not by a family
     added_in_version: str = "1.0"
@@ -72,10 +72,10 @@ class FeatureSpec:
             raise ValueError(f"{self.name}: unknown rank policy {self.rank!r}")
         if self.kind != "numeric" and self.rank != "none":
             raise ValueError(f"{self.name}: only numeric features are ranked")
-        if self.rank != "pinned_zero" and self.zero_rank != 0.0:
-            raise ValueError(f"{self.name}: zero_rank needs rank='pinned_zero'")
-        if not 0.0 <= self.zero_rank <= 1.0:
-            raise ValueError(f"{self.name}: zero_rank must lie in [0, 1]")
+        if self.rank != "pinned" and (self.pin_value, self.pin_rank) != (0.0, 0.0):
+            raise ValueError(f"{self.name}: pin_value/pin_rank need rank='pinned'")
+        if not 0.0 <= self.pin_rank <= 1.0:
+            raise ValueError(f"{self.name}: pin_rank must lie in [0, 1]")
         if self.sector_rank and self.rank == "none":
             raise ValueError(f"{self.name}: sector_rank requires a rank policy")
 
@@ -105,37 +105,37 @@ FEATURES: tuple[FeatureSpec, ...] = (
     _f("earnings_yield", "valuation", "T0", "numeric", "netinc / marketcap", sector_rank=True),
     _f("ocf_yield", "valuation", "T0", "numeric", "ncfo / marketcap", sector_rank=True),
     _f("fcf_yield", "valuation", "T0", "numeric", "fcf / marketcap", sector_rank=True),
-    _f("sales_yield", "valuation", "T0", "numeric", "revenue / marketcap", rank="pinned_zero", sector_rank=True),
+    _f("sales_yield", "valuation", "T0", "numeric", "revenue / marketcap", rank="pinned", pin_rank=0.0, sector_rank=True),
     _f("book_to_market", "valuation", "T0", "numeric", "equity_q / marketcap", sector_rank=True),
     _f("tangible_book_to_market", "valuation", "T0", "numeric", "tangibles_q / marketcap", sector_rank=True),
     _f("ebit_to_ev", "valuation", "T0", "numeric", "ebit / ev", sector_rank=True),
     _f("ebitda_to_ev", "valuation", "T0", "numeric", "ebitda / ev", sector_rank=True),
-    _f("dividend_yield", "valuation", "T0", "numeric", "-ncfdiv / marketcap", rank="pinned_zero"),
-    _f("net_payout_yield", "valuation", "T0", "numeric", "-(ncfdiv + ncfcommon) / marketcap", rank="pinned_zero", zero_rank=0.5),
+    _f("dividend_yield", "valuation", "T0", "numeric", "-ncfdiv / marketcap", rank="pinned", pin_rank=0.0),
+    _f("net_payout_yield", "valuation", "T0", "numeric", "-(ncfdiv + ncfcommon) / marketcap", rank="pinned", pin_rank=0.5),
     _f("ncav_to_marketcap", "valuation", "T0", "numeric", "(assetsc_q - liabilities_q) / marketcap"),
-    _f("ev_to_marketcap", "valuation", "T0", "numeric", "ev / marketcap"),
+    _f("ev_to_marketcap", "valuation", "T0", "numeric", "ev / marketcap", rank="pinned", pin_value=1.0, pin_rank=0.5),
     # ---- profitability ----------------------------------------------------
-    _f("gp_to_assets", "profitability", "T0", "numeric", "gp / assets_q", sector_rank=True),
+    _f("gp_to_assets", "profitability", "T0", "numeric", "gp / assets_q", rank="pinned", pin_rank=0.5, sector_rank=True),
     _f("roa", "profitability", "T0", "numeric", "netinc / assets_q"),
     _f("roe", "profitability", "T0", "numeric", "netinc / equity_q"),
     _f("ebit_to_invcap", "profitability", "T0", "numeric", "ebit / invcap_q"),
     _f("roc_greenblatt", "profitability", "T0", "numeric", "ebit / (workingcapital_q + ppnenet_q)"),
-    _f("gross_margin", "profitability", "T0", "numeric", "gp / revenue", sector_rank=True),
+    _f("gross_margin", "profitability", "T0", "numeric", "gp / revenue", rank="pinned", pin_value=1.0, pin_rank=1.0, sector_rank=True),
     _f("operating_margin", "profitability", "T0", "numeric", "ebit / revenue", sector_rank=True),
     _f("net_margin", "profitability", "T0", "numeric", "netinc / revenue", sector_rank=True),
     _f("fcf_margin", "profitability", "T0", "numeric", "fcf / revenue"),
     _f("cfo_to_assets", "profitability", "T0", "numeric", "ncfo / assets_q"),
-    _f("asset_turnover", "profitability", "T0", "numeric", "revenue / assets_q", rank="pinned_zero"),
+    _f("asset_turnover", "profitability", "T0", "numeric", "revenue / assets_q", rank="pinned", pin_rank=0.0),
     # ---- growth & trends ---------------------------------------------------
     _f("revenue_growth_1y", "growth", "T1", "numeric", "revenue / revenue[-1] - 1"),
     _f("revenue_growth_3y", "growth", "T3", "numeric", "(revenue / revenue[-3])^(1/3) - 1"),
     _f("epsdil_growth_1y", "growth", "T1", "numeric", "epsdil / epsdil[-1] - 1"),
     _f("roa_delta_1y", "growth", "T1", "numeric", "roa - roa[-1]"),
-    _f("gross_margin_delta_1y", "growth", "T1", "numeric", "gross_margin - gross_margin[-1]"),
-    _f("gross_margin_delta_2y", "growth", "T2", "numeric", "gross_margin - gross_margin[-2]"),
-    _f("asset_turnover_delta_1y", "growth", "T1", "numeric", "asset_turnover - asset_turnover[-1]"),
+    _f("gross_margin_delta_1y", "growth", "T1", "numeric", "gross_margin - gross_margin[-1]", rank="pinned", pin_rank=0.5),
+    _f("gross_margin_delta_2y", "growth", "T2", "numeric", "gross_margin - gross_margin[-2]", rank="pinned", pin_rank=0.5),
+    _f("asset_turnover_delta_1y", "growth", "T1", "numeric", "asset_turnover - asset_turnover[-1]", rank="pinned", pin_rank=0.5),
     _f("asset_growth_1y", "growth", "T1", "numeric", "assets_q / assets_q[-1] - 1"),
-    _f("share_count_growth_1y", "growth", "T1", "numeric", "(sharesbas*sharefactor) YoY - 1", rank="pinned_zero", zero_rank=0.5),
+    _f("share_count_growth_1y", "growth", "T1", "numeric", "(sharesbas*sharefactor) YoY - 1", rank="pinned", pin_rank=0.5),
     # ---- trend & consistency (ADR 0015; quarterly windows, annual dividends)
     _f("revenue_trend_4q", "trend", "T1", "numeric", "regr_slope(ln(revenue), years) over last 4 quarterly obs", added_in_version="1.1"),
     _f("revenue_consistency_4q", "trend", "T1", "numeric", "regr_r2 of the 4q revenue fit", added_in_version="1.1"),
@@ -193,12 +193,12 @@ FEATURES: tuple[FeatureSpec, ...] = (
     _f("current_ratio", "solvency", "T0", "numeric", "assetsc_q / liabilitiesc_q"),
     _f("quick_ratio", "solvency", "T0", "numeric", "(assetsc_q - inventory_q) / liabilitiesc_q"),
     _f("cash_to_assets", "solvency", "T0", "numeric", "cashneq_q / assets_q"),
-    _f("debt_to_equity", "solvency", "T0", "numeric", "debt_q / equity_q", rank="pinned_zero"),
+    _f("debt_to_equity", "solvency", "T0", "numeric", "debt_q / equity_q", rank="pinned", pin_rank=0.0),
     _f("net_debt_to_ebitda", "solvency", "T0", "numeric", "(debt_q - cashneq_q) / ebitda"),
     _f("interest_coverage", "solvency", "T0", "numeric", "ebit / intexp"),
     _f("ffo_to_liabilities", "solvency", "T0", "numeric", "ncfo / liabilities_q"),
     _f("log_assets", "solvency", "T0", "numeric", "ln(assets_q)"),
-    _f("ni_change_scaled", "solvency", "T1", "numeric", "(netinc - netinc[-1]) / (|netinc| + |netinc[-1]|)"),
+    _f("ni_change_scaled", "solvency", "T1", "numeric", "(netinc - netinc[-1]) / (|netinc| + |netinc[-1]|)", rank="pinned", pin_rank=0.5),
     _f("two_year_loss", "solvency", "T1", "flag", "netinc < 0 AND netinc[-1] < 0"),
     _f("liab_gt_assets", "solvency", "T0", "flag", "liabilities_q > assets_q"),
     _f("altman_z", "solvency", "T0", "numeric", "1.2 wc/ta + 1.4 re/ta + 3.3 ebit/ta + 0.6 mve/tl + 1.0 s/ta"),
@@ -206,7 +206,7 @@ FEATURES: tuple[FeatureSpec, ...] = (
     _f("zmijewski", "solvency", "T0", "numeric", "-4.336 - 4.513 roa + 5.679 tl/ta + 0.004 ca/cl"),
     # ---- earnings quality (Beneish inputs are ART pairs, T1) ---------------
     _f("dsri", "quality", "T1", "numeric", "(receivables_q/revenue) YoY ratio"),
-    _f("gmi", "quality", "T1", "numeric", "gross_margin[-1] / gross_margin"),
+    _f("gmi", "quality", "T1", "numeric", "gross_margin[-1] / gross_margin", rank="pinned", pin_value=1.0, pin_rank=0.5),
     _f("aqi", "quality", "T1", "numeric", "(1 - (assetsc_q + ppnenet_q)/assets_q) YoY ratio"),
     _f("sgi", "quality", "T1", "numeric", "revenue / revenue[-1]"),
     _f("depi", "quality", "T1", "numeric", "(depamor/(depamor + ppnenet_q)) YoY ratio, prior/current"),
@@ -216,19 +216,19 @@ FEATURES: tuple[FeatureSpec, ...] = (
     _f("beneish_m", "quality", "T1", "numeric", "Beneish M composite over the 8 indices"),
     _f("piotroski_f", "quality", "T1", "numeric", "count of the 9 F-score signals", rank="none"),
     _f("noa_to_assets", "quality", "T1", "numeric", "net operating assets / assets_q[-1]"),
-    _f("ext_financing_to_assets", "quality", "T0", "numeric", "(ncfcommon + ncfdebt) / assets_q", rank="pinned_zero", zero_rank=0.5),
-    _f("rnd_to_assets", "quality", "T0", "numeric", "coalesce(rnd, 0) / assets_q (unreported R&D = 0, ADR 0013)", rank="pinned_zero"),
-    _f("capex_to_assets", "quality", "T0", "numeric", "-capex / assets_q", rank="pinned_zero"),
+    _f("ext_financing_to_assets", "quality", "T0", "numeric", "(ncfcommon + ncfdebt) / assets_q", rank="pinned", pin_rank=0.5),
+    _f("rnd_to_assets", "quality", "T0", "numeric", "coalesce(rnd, 0) / assets_q (unreported R&D = 0, ADR 0013)", rank="pinned", pin_rank=0.0),
+    _f("capex_to_assets", "quality", "T0", "numeric", "-capex / assets_q", rank="pinned", pin_rank=0.0),
     _f("roa_variability_3y", "quality", "T3", "numeric", "stddev of {roa, roa[-1], roa[-2], roa[-3]}"),
     _f("revenue_growth_variability_3y", "quality", "T3", "numeric", "stddev of the 3 YoY revenue growths"),
     _f("mohanram_g7", "quality", "T3", "numeric", "7-signal G-score vs. famaindustry medians", rank="none", assembly_stage=True),
     # ---- technical (from SEP; differs across snapshot kinds) ----------------
     _f("mom_12_2", "technical", "P12", "numeric", "total return t-252 -> t-21"),
     _f("ret_6m", "technical", "P12", "numeric", "total return t-126 -> t"),
-    _f("ret_1m", "technical", "P12", "numeric", "total return t-21 -> t"),
+    _f("ret_1m", "technical", "P12", "numeric", "total return t-21 -> t", rank="pinned", pin_rank=0.5),
     _f("vol_12m", "technical", "P12", "numeric", "ann. sigma of daily log returns, >=200 obs"),
     _f("vol_36m", "technical", "P36", "numeric", "ann. sigma over 756d, >=600 obs"),
-    _f("dist_52w_high", "technical", "P12", "numeric", "closeadj / max_252d closeadj - 1", rank="pinned_zero", zero_rank=1.0),
+    _f("dist_52w_high", "technical", "P12", "numeric", "closeadj / max_252d closeadj - 1", rank="pinned", pin_rank=1.0),
     _f("log_marketcap", "technical", "T0", "numeric", "ln(marketcap)"),
     _f("dollar_volume_3m", "technical", "P12", "numeric", "median daily close*volume, t-63 -> t"),
     _f("amihud_12m", "technical", "P12", "numeric", "mean |ret| / (close*volume)"),

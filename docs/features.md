@@ -47,10 +47,11 @@ versions diffable from the registry alone.
   snapshot_kind), NULL-safe, thin-slice guard 20 — unless its notes say
   otherwise. **not ranked**: integer-valued composites, counts and shares
   (a tied score group's within-quarter rank is a quarter identifier; the
-  raw score is already comparable). **zero-pinned rank (z)**: features
-  with a mass at exactly zero — zeros take the fixed rank *z*, non-zero
-  values are percent-ranked within their sign class onto the matching side
-  of the pin (negatives in [0, z], positives in [z, 1]). Rows marked **S**
+  raw score is already comparable). **pinned rank (r)** / **pinned rank
+  (r at raw v)**: features with a probability mass at one raw value *v*
+  (0 unless stated) — rows at *v* take the fixed rank *r*, the rest are
+  percent-ranked within their side of the pin onto the matching interval
+  (below in [0, r], above in [r, 1]). Rows marked **S**
   additionally ship `{name}_secrank` within (quarter, kind, sector) under
   the same policy. Flags (bool) and classification columns are never
   ranked. Assembly audits every rank column for calendar-quarter keys and
@@ -90,31 +91,31 @@ versions diffable from the registry alone.
 | `earnings_yield` | T0 | `netinc / marketcap` | S |
 | `ocf_yield` | T0 | `ncfo / marketcap` | S |
 | `fcf_yield` | T0 | `fcf / marketcap` | S |
-| `sales_yield` | T0 | `revenue / marketcap` | S; zero-pinned rank (0) — pre-revenue firms |
+| `sales_yield` | T0 | `revenue / marketcap` | S; pinned rank (0) — pre-revenue firms |
 | `book_to_market` | T0 | `equity_q / marketcap` | S; negative book kept (yield orientation) |
 | `tangible_book_to_market` | T0 | `tangibles_q / marketcap` | S |
 | `ebit_to_ev` | T0 | `ebit / ev` | S; NULL if `ev ≤ 0`; Magic-formula earnings yield |
 | `ebitda_to_ev` | T0 | `ebitda / ev` | S; NULL if `ev ≤ 0` |
-| `dividend_yield` | T0 | `−ncfdiv / marketcap` | cash-flow-statement convention; zero-pinned rank (0) — non-payers |
-| `net_payout_yield` | T0 | `−(ncfdiv + ncfcommon) / marketcap` | Conservative-formula input; zero-pinned rank (0.5) — signed, no payout or issuance at 0.5 |
+| `dividend_yield` | T0 | `−ncfdiv / marketcap` | cash-flow-statement convention; pinned rank (0) — non-payers |
+| `net_payout_yield` | T0 | `−(ncfdiv + ncfcommon) / marketcap` | Conservative-formula input; pinned rank (0.5) — signed, no payout or issuance at 0.5 |
 | `ncav_to_marketcap` | T0 ⌂ | `(assetsc_q − liabilities_q) / marketcap` | Graham net-net discount |
-| `ev_to_marketcap` | T0 | `ev / marketcap` | leverage-in-price; negative-EV magnitude |
+| `ev_to_marketcap` | T0 | `ev / marketcap` | leverage-in-price; negative-EV magnitude; pinned rank (0.5 at raw 1) — no net debt at 0.5 |
 
 ## Profitability
 
 | column | tier | definition | notes |
 |---|---|---|---|
-| `gp_to_assets` | T0 | `gp / assets_q` | S; Novy-Marx |
+| `gp_to_assets` | T0 | `gp / assets_q` | S; Novy-Marx; pinned rank (0.5) — signed, pre-revenue firms at 0.5 |
 | `roa` | T0 | `netinc / assets_q` | F-score, O-score, Zmijewski input |
 | `roe` | T0 | `netinc / equity_q` | NULL if `equity_q ≤ 0` |
 | `ebit_to_invcap` | T0 | `ebit / invcap_q` | NULL if `invcap_q ≤ 0` |
 | `roc_greenblatt` | T0 ⌂ | `ebit / (workingcapital_q + ppnenet_q)` | NULL if denom ≤ 0; Magic-formula ROC |
-| `gross_margin` | T0 | `gp / revenue` | S |
+| `gross_margin` | T0 | `gp / revenue` | S; pinned rank (1 at raw 1) — no cost of revenue reported ⇒ margin exactly 1, the top |
 | `operating_margin` | T0 | `ebit / revenue` | S |
 | `net_margin` | T0 | `netinc / revenue` | S |
 | `fcf_margin` | T0 | `fcf / revenue` | |
 | `cfo_to_assets` | T0 | `ncfo / assets_q` | G-score CFROA |
-| `asset_turnover` | T0 | `revenue / assets_q` | F-score & Z input; zero-pinned rank (0) — pre-revenue firms |
+| `asset_turnover` | T0 | `revenue / assets_q` | F-score & Z input; pinned rank (0) — pre-revenue firms |
 
 All `x / revenue` NULL when `revenue ≤ 0`; denominators are current-quarter
 levels, not `*avg` (one convention everywhere; noted deviation from
@@ -128,11 +129,11 @@ textbook ROA).
 | `revenue_growth_3y` | T3 | `(revenue / revenue₋₃)^(1/3) − 1` | same null rule |
 | `epsdil_growth_1y` | T1 | `epsdil / epsdil₋₁ − 1` | NULL if `epsdil₋₁ ≤ 0` |
 | `roa_delta_1y` | T1 | `roa − roa₋₁` | F-score signal 3 |
-| `gross_margin_delta_1y` | T1 | `gross_margin − gross_margin₋₁` | F-score signal 8 |
-| `gross_margin_delta_2y` | T2 | `gross_margin − gross_margin₋₂` | trend depth |
-| `asset_turnover_delta_1y` | T1 | `asset_turnover − asset_turnover₋₁` | F-score signal 9 |
+| `gross_margin_delta_1y` | T1 | `gross_margin − gross_margin₋₁` | F-score signal 8; pinned rank (0.5) — unchanged margin at 0.5 |
+| `gross_margin_delta_2y` | T2 | `gross_margin − gross_margin₋₂` | trend depth; pinned rank (0.5) |
+| `asset_turnover_delta_1y` | T1 | `asset_turnover − asset_turnover₋₁` | F-score signal 9; pinned rank (0.5) — signed, unchanged turnover at 0.5 |
 | `asset_growth_1y` | T1 | `assets_q / assets_q₋₁ − 1` | Cooper–Gulen–Schill |
-| `share_count_growth_1y` | T1 | `(sharesbas·sharefactor) YoY − 1` | dilution; F-score signal 7 proxy; zero-pinned rank (0.5) — unchanged share count at 0.5 |
+| `share_count_growth_1y` | T1 | `(sharesbas·sharefactor) YoY − 1` | dilution; F-score signal 7 proxy; pinned rank (0.5) — unchanged share count at 0.5 |
 
 ## Trend & consistency (ADR 0015; added in v1.1)
 
@@ -211,12 +212,12 @@ dividend year ⇒ the dividend counters are NULL.
 | `current_ratio` | T0 ⌂ | `assetsc_q / liabilitiesc_q` | F-score signal 6 base |
 | `quick_ratio` | T0 ⌂ | `(assetsc_q − inventory_q) / liabilitiesc_q` | |
 | `cash_to_assets` | T0 | `cashneq_q / assets_q` | |
-| `debt_to_equity` | T0 | `debt_q / equity_q` | NULL if `equity_q ≤ 0`; zero-pinned rank (0) — debt-free firms |
+| `debt_to_equity` | T0 | `debt_q / equity_q` | NULL if `equity_q ≤ 0`; pinned rank (0) — debt-free firms |
 | `net_debt_to_ebitda` | T0 | `(debt_q − cashneq_q) / ebitda` | NULL if `ebitda ≤ 0` |
 | `interest_coverage` | T0 | `ebit / intexp` | NULL if `intexp ≤ 0` (no debt ⇒ NULL, not ∞) |
 | `ffo_to_liabilities` | T0 | `ncfo / liabilities_q` | O component (FFO proxied by CFO, §F1 gap) |
 | `log_assets` | T0 | `ln(assets_q)` | O size term (nominal; rank fixes drift) |
-| `ni_change_scaled` | T1 | `(netinc − netinc₋₁) / (|netinc| + |netinc₋₁|)` | O component |
+| `ni_change_scaled` | T1 | `(netinc − netinc₋₁) / (|netinc| + |netinc₋₁|)` | O component; pinned rank (0.5) — signed, unchanged net income at 0.5 |
 | `two_year_loss` | T1 | `netinc < 0 AND netinc₋₁ < 0` | flag; O component |
 | `liab_gt_assets` | T0 | `liabilities_q > assets_q` | flag; O component |
 | `altman_z` | T0 ⌂⌐ | `1.2·wc/ta + 1.4·re/ta + 3.3·ebit/ta + 0.6·mve/tl + 1.0·s/ta` | composite; literature comparability |
@@ -231,7 +232,7 @@ composite is deferred (ADR 0003) — its components are all above.
 | column | tier | definition | notes |
 |---|---|---|---|
 | `dsri` | T1 | `(receivables_q/revenue) / (receivables_q₋₁/revenue₋₁)` | |
-| `gmi` | T1 | `gross_margin₋₁ / gross_margin` | NULL if either margin ≤ 0 |
+| `gmi` | T1 | `gross_margin₋₁ / gross_margin` | NULL if either margin ≤ 0; pinned rank (0.5 at raw 1) — unchanged margin at 0.5 |
 | `aqi` | T1 ⌂ | `(1 − (assetsc_q + ppnenet_q)/assets_q)` YoY ratio | |
 | `sgi` | T1 | `revenue / revenue₋₁` | |
 | `depi` | T1 | `(depamor/(depamor + ppnenet_q))₋₁ / (…)current` | |
@@ -241,9 +242,9 @@ composite is deferred (ADR 0003) — its components are all above.
 | `beneish_m` | T1 ⌂ | `−4.84 + 0.92·dsri + 0.528·gmi + 0.404·aqi + 0.892·sgi + 0.115·depi − 0.172·sgai + 4.679·tata − 0.327·lvgi` | composite |
 | `piotroski_f` | T1 | count of the 9 signals (research §F2.2 table) | composite, 0–9; signals from components above + `ncfcommon ≤ 0`; not ranked (integer score, ADR 0016) |
 | `noa_to_assets` | T1 | `((assets_q − cashneq_q − investments_q) − (liabilities_q − debt_q)) / assets_q₋₁` | Hirshleifer NOA |
-| `ext_financing_to_assets` | T0 | `(ncfcommon + ncfdebt) / assets_q` | Bradshaw–Richardson–Sloan; zero-pinned rank (0.5) — signed, no external financing at 0.5 |
-| `rnd_to_assets` | T0 | `coalesce(rnd, 0) / assets_q` | G-score input; unreported R&D counts as 0 — the one explicit fill (ADR 0013); zero-pinned rank (0) |
-| `capex_to_assets` | T0 | `−capex / assets_q` | G-score input; cash-flow sign convention; zero-pinned rank (0) — no capex |
+| `ext_financing_to_assets` | T0 | `(ncfcommon + ncfdebt) / assets_q` | Bradshaw–Richardson–Sloan; pinned rank (0.5) — signed, no external financing at 0.5 |
+| `rnd_to_assets` | T0 | `coalesce(rnd, 0) / assets_q` | G-score input; unreported R&D counts as 0 — the one explicit fill (ADR 0013); pinned rank (0) |
+| `capex_to_assets` | T0 | `−capex / assets_q` | G-score input; cash-flow sign convention; pinned rank (0) — no capex |
 | `roa_variability_3y` | T3 | stddev of `{roa, roa₋₁, roa₋₂, roa₋₃}` | G-score input; NULL unless all four exist |
 | `revenue_growth_variability_3y` | T3 | stddev of the 3 YoY revenue growths | G-score input; NULL unless all three exist |
 | `mohanram_g7` | T3 | 7-signal variant vs. `famaindustry` medians (ADR 0013) | **assembly-stage** (needs cross-section); advertising signal unavailable; not ranked (integer score, ADR 0016) |
@@ -254,10 +255,10 @@ composite is deferred (ADR 0003) — its components are all above.
 |---|---|---|---|
 | `mom_12_2` | P12 | total return t−252 → t−21 | S is not applied; plain rank only |
 | `ret_6m` | P12 | total return t−126 → t | |
-| `ret_1m` | P12 | total return t−21 → t | short-term reversal |
+| `ret_1m` | P12 | total return t−21 → t | short-term reversal; pinned rank (0.5) — no price change at 0.5 |
 | `vol_12m` | P12 | ann. σ of daily log returns, ≥200 obs | |
 | `vol_36m` | P36 | same over 756d, ≥600 obs | Conservative-formula input |
-| `dist_52w_high` | P12 | `closeadj / max₍t−252…t₎ closeadj − 1` | ≤ 0; zero-pinned rank (1) — at the 52-week high sits at the top |
+| `dist_52w_high` | P12 | `closeadj / max₍t−252…t₎ closeadj − 1` | ≤ 0; pinned rank (1) — at the 52-week high sits at the top |
 | `log_marketcap` | T0 | `ln(marketcap)` | |
 | `dollar_volume_3m` | P12 | median daily `close × volume`, t−63 → t | liquidity column (TODO microcap question) |
 | `amihud_12m` | P12 | mean `|ret| / (close × volume)` | illiquidity |

@@ -1,4 +1,4 @@
-# 0016 — Per-feature rank policy: no ranks for integer scores, zero-pinned ranks for mass points, a quarter-key audit
+# 0016 — Per-feature rank policy: no ranks for integer scores, pinned ranks for mass points, a quarter-key audit
 
 Date: 2026-09-03
 Status: accepted (amends 0008 §2/§4 and 0013 "ranked like any numeric feature")
@@ -63,33 +63,43 @@ cross-section.
      fixed-scale [0, 1] version (`piotroski_f / 9`) is a downstream
      one-liner if wanted, and is deliberately **not** shipped as a column —
      it would be redundant with the raw score.
-   - **`pinned_zero`** — for features with a probability mass at exactly
-     zero, with a declared pin `zero_rank ∈ {0, 0.5, 1}`: exact zeros take
-     the rank `zero_rank` in every quarter; non-zero values are
-     `percent_rank()`ed **within their sign class** and mapped onto the
-     matching side of the pin — negatives to `zero_rank · pr`, positives to
-     `zero_rank + (1 − zero_rank) · pr`. The zero group's rank is thus a
-     fixed constant instead of the quarter's zero share, the mapping is
-     weakly monotone in the raw value, and each sign class is continuous,
-     so no key remains. The pin sits at the empty end of a one-sided
-     support and in the middle of a signed one:
-     - pin **0**: `dividend_yield` (non-payers), `rnd_to_assets`
-       (non-reporters, the ADR 0013 fill), `capex_to_assets`,
-       `debt_to_equity` (debt-free), `sales_yield` and `asset_turnover`
-       (pre-revenue firms);
-     - pin **0.5**: `net_payout_yield` (neither payout nor issuance),
-       `ext_financing_to_assets`, `share_count_growth_1y` (unchanged share
-       count) — signed supports, negatives below the pin, positives above;
-     - pin **1**: `dist_52w_high` (≤ 0 by construction; a stock at its
-       52-week high is the top of the cross-section, and a large share of
-       `high`-kind rows sit exactly there).
-     The smallest non-zero value of a one-sided feature shares the pin
-     (its within-class percent rank is 0); accepted — the raw column
-     separates them, and the alternative (a NULL rank for zeros) would
+   - **`pinned`** — for features with a probability mass at exactly one
+     raw value, declared as `pin_value` (0 unless stated) with a pin rank
+     `pin_rank ∈ {0, 0.5, 1}`: rows at `pin_value` take the rank
+     `pin_rank` in every quarter; the rest are `percent_rank()`ed **within
+     their side of the pin** and mapped onto the matching interval — below
+     to `pin_rank · pr`, above to `pin_rank + (1 − pin_rank) · pr`. The
+     mass's rank is thus a fixed constant instead of the quarter's share
+     below it, the mapping is weakly monotone in the raw value, and each
+     side is continuous, so no key remains. The pin rank sits at the empty
+     end of a one-sided support and in the middle of a two-sided one:
+     - mass at 0, rank **0**: `dividend_yield` (non-payers),
+       `rnd_to_assets` (non-reporters, the ADR 0013 fill),
+       `capex_to_assets`, `debt_to_equity` (debt-free), `sales_yield` and
+       `asset_turnover` (pre-revenue firms);
+     - mass at 0, rank **0.5**: `net_payout_yield` (neither payout nor
+       issuance), `ext_financing_to_assets`, `share_count_growth_1y`
+       (unchanged share count), and — found by the first real-data audit
+       run, 2026-09-07 — `gp_to_assets` (pre-revenue firms, gross profit
+       exactly 0), `asset_turnover_delta_1y`, `gross_margin_delta_1y`,
+       `gross_margin_delta_2y`, `ni_change_scaled` (unchanged YoY) and
+       `ret_1m` (no price change in a month) — signed supports, negatives
+       below the pin, positives above;
+     - mass at 0, rank **1**: `dist_52w_high` (≤ 0 by construction; a
+       stock at its 52-week high is the top of the cross-section, and a
+       large share of `high`-kind rows sit exactly there);
+     - mass at **1** (same audit run): `gross_margin` at rank **1** (no
+       cost of revenue reported ⇒ gross profit = revenue, and the margin is
+       ≤ 1 by construction), `gmi` (unchanged margin, a ratio of 1) and
+       `ev_to_marketcap` (no debt and no cash ⇒ EV = market cap) at rank
+       **0.5**.
+     The value nearest the pin on a one-sided support shares the pin rank
+     (its within-side percent rank is 0); accepted — the raw column
+     separates them, and the alternative (a NULL rank for the mass) would
      conflate "zero" with "not knowable" (manual §6). Anomalous values on
-     the wrong side of a one-sided pin (a positive `dist_52w_high`) collapse
-     onto the pin. The thin-slice guard keeps counting non-NULL values, not
-     the non-zero support.
+     the wrong side of a one-sided pin (a positive `dist_52w_high`, a
+     gross margin above 1) collapse onto the pin. The thin-slice guard
+     keeps counting non-NULL values, not the off-pin support.
 
    Sector ranks (`_secrank`) follow the same policy as the feature's
    plain rank. `conservative_score` keeps its formula
@@ -107,6 +117,7 @@ cross-section.
    | `tie_mass` | share of rows whose rank value is shared with ≥ 1 other row of the same (quarter, kind) — the brief's (i) |
    | `keyed_mass` | share of rows in such tie groups whose rank value occurs in exactly one quarter of that kind |
    | `max_key_share` | the largest keyed tie group as a share of its (quarter, kind) cross-section |
+   | `key_quarter`, `key_rank_value`, `key_raw_value` | where that group sits and the raw value behind it — the raw value is the `pin_value` a registry fix declares (or says the feature is integer-valued ⇒ `none`) |
    | `distinct_values`, `distinct_quarter_value_pairs`, `quarters` | the brief's (ii) |
 
    The **gate is `max_key_share > --max-key-share` (default 0.02)**, not
@@ -116,8 +127,10 @@ cross-section.
    few percent of a cross-section is a resolvable constant. Zero-pinned
    groups are tied in every quarter but never keyed (the pin recurs), so
    they pass by construction. A failing audit **removes the directory and
-   exits 1**, naming the columns, their kinds and shares, and the remedy
-   (change the feature's rank policy in the registry and rebuild).
+   exits 1**, naming every column with its worst group and the remedy
+   (change the feature's rank policy in the registry and rebuild), and
+   keeps the audit table under `data/interim/qa/` so the failure can be
+   read without a rebuild.
    `--allow-rank-keys` publishes anyway; the keyed columns are then listed
    in `manifest.json["rank_audit"]["flagged"]`. The full table ships as
    `rank_audit.parquet` in the dataset directory, and the manifest carries
@@ -126,7 +139,7 @@ cross-section.
    brief's option (b), on top of (a).
 
 3. **Dataset v1.2, a breaking change.** Rank column semantics change for
-   ten features and 24 rank columns disappear, so results must not be
+   19 features and 24 rank columns disappear, so results must not be
    compared across the v1.1 → v1.2 boundary; rank-fed downstream configs
    need a `min_dataset_version` bump. `sharadar-assemble` defaults to
    `1.2`. The inference dataset (decision 0014) uses the same
@@ -147,7 +160,7 @@ cross-section.
 ## Consequences
 
 - `docs/features.md` notes carry the policy per row (`not ranked`,
-  `zero-pinned rank (z)`); `docs/dataset.md` documents the rank groups,
+  `pinned rank (r [at raw v])`); `docs/dataset.md` documents the rank groups,
   `rank_audit.parquet` and the new manifest fields; `docs/manual.md` tells
   downstream how to read them and about the version boundary.
 - Decision 0008 §2 ("Column naming: `{feature}_rank`" for every numeric)
@@ -155,11 +168,14 @@ cross-section.
   decision 0013's "ranked like any numeric feature" are amended by §1
   above; 0008's mechanics are otherwise unchanged.
 - A registry mistake (a mass point nobody declared) cannot silently return:
-  the next real-data build fails with the column named. The policy list in
-  §1 was decided from feature definitions, not measured on the real
-  parquet, so the first v1.2 build is expected to be the audit's first real
-  test — a flagged column means "declare its policy", not "raise the
-  threshold".
+  the next real-data build fails with the column, quarter and raw value
+  named, and keeps the audit table. The first policy list was decided from
+  feature definitions; the first real-data build (2026-09-07, 1.53M rows)
+  flagged eleven more columns (worst: `ni_change_scaled` 20%,
+  `gp_to_assets` 19%, `asset_turnover_delta_1y` 14%, the gross-margin
+  family 6–8%, `ret_1m` and `ev_to_marketcap` ~2–3%), which is where the
+  mass-at-1 pins come from. A flagged column means "declare its policy",
+  not "raise the threshold".
 - The leakage-gap experiment (decision 0010) and the era probe become
   meaningful for rank-fed models; their downstream registrations stand.
 - Cost: 24 fewer rank columns; ~113 extra column-pruned scans of the

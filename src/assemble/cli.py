@@ -14,8 +14,9 @@ Produces data/datasets/dataset_v{VERSION}/ with dataset.parquet (features ×
 ranks × labels × uniqueness weights), the split files, rank_audit.parquet,
 and manifest.json. Dataset directories are immutable: an existing version
 is refused unless --force is given. The build fails (exit 1, directory
-removed) when a rank column carries a calendar-quarter key (decision 0016)
-unless --allow-rank-keys is given.
+removed, audit table kept under data/interim/qa/) when a rank column
+carries a calendar-quarter key (decision 0016) unless --allow-rank-keys is
+given.
 """
 
 from __future__ import annotations
@@ -183,6 +184,7 @@ def main(argv: list[str] | None = None) -> int:
             force=args.force,
             max_key_share=args.max_key_share,
             allow_rank_keys=args.allow_rank_keys,
+            audit_keep_dir=interim_dir / "qa",
         )
     except (FileExistsError, ValueError) as exc:
         logger.error("%s", exc)

@@ -76,14 +76,16 @@ policy, published in `manifest.json["rank_policy"]`:
   `ocf_positive_frac_*`. Use the raw column; it is already comparable
   across quarters. Do not rank them yourself within quarter — you would
   rebuild the key.
-- **Zero-pinned ranks** (`{"rank": "pinned_zero", "zero_rank": z}`): exact
-  zeros rank *z* in every quarter; non-zero values are percent-ranked
-  within their sign class, negatives onto [0, z] and positives onto
-  [z, 1]. So `dividend_yield_rank = 0` means "no dividend, or the
-  smallest yield among payers", `dividend_yield_rank = 0.8` means "top
-  fifth of *payers*"; `net_payout_yield_rank` is 0.5 at zero, below for
-  net issuers, above for net payers; `dist_52w_high_rank = 1` means "at
-  its 52-week high".
+- **Pinned ranks** (`{"rank": "pinned", "pin_value": v, "pin_rank": r}`):
+  rows at exactly raw value *v* (usually 0) rank *r* in every quarter; the
+  rest are percent-ranked within their side of the pin, below onto [0, r]
+  and above onto [r, 1]. So `dividend_yield_rank = 0` means "no dividend,
+  or the smallest yield among payers", `dividend_yield_rank = 0.8` means
+  "top fifth of *payers*"; `net_payout_yield_rank` is 0.5 at zero, below
+  for net issuers, above for net payers; `dist_52w_high_rank = 1` means
+  "at its 52-week high"; `gross_margin_rank = 1` means "no cost of revenue
+  reported" (margin exactly 1), and `ev_to_marketcap_rank` is 0.5 at
+  exactly 1 (no net debt).
 - **Full ranks** are the decision-0008 percent rank, unchanged.
 
 `rank_audit.parquet` (summarised in `manifest.json["rank_audit"]`) reports
@@ -92,7 +94,7 @@ group (`max_key_share`); a shipped version has an empty
 `rank_audit.flagged` unless upstream published under `--allow-rank-keys`,
 in which case exclude the listed columns from rank-fed models.
 
-**v1.1 → v1.2 is a breaking boundary**: 24 rank columns disappear and ten
+**v1.1 → v1.2 is a breaking boundary**: 24 rank columns disappear and 19
 change semantics. Do not compare rank-fed results across it; bump
 `min_dataset_version` on rank-fed configs. Raw columns and flags are
 unchanged.

@@ -2,7 +2,7 @@
 
 Parses the markdown feature tables (one section per family) and compares
 names, order, depth tiers, sector-rank markers, rank policy markers
-("not ranked" / "zero-pinned rank (z)", ADR 0016) and assembly-stage notes
+("not ranked" / "pinned rank (r [at raw v])", ADR 0016) and assembly-stage notes
 against the code registry.
 """
 
@@ -58,13 +58,17 @@ def parse_doc_rows() -> list[dict]:
         # merely starts with the letter (e.g. "S is not applied").
         sector = bool(re.match(r"S(;|$)", notes))
         assembly = "assembly-stage" in notes
-        pinned = re.search(r"zero-pinned rank \(([0-9.]+)\)", notes)
+        pinned = re.search(
+            r"pinned rank \(([0-9.]+)(?: at raw ([-0-9.]+))?\)", notes
+        )
         if "not ranked" in notes:
-            rank, zero_rank = "none", 0.0
+            rank, pin_rank, pin_value = "none", 0.0, 0.0
         elif pinned:
-            rank, zero_rank = "pinned_zero", float(pinned.group(1))
+            rank = "pinned"
+            pin_rank = float(pinned.group(1))
+            pin_value = float(pinned.group(2) or 0.0)
         else:
-            rank, zero_rank = "full", 0.0
+            rank, pin_rank, pin_value = "full", 0.0, 0.0
         for name in names:
             rows.append(
                 {
@@ -74,7 +78,8 @@ def parse_doc_rows() -> list[dict]:
                     "sector_rank": sector,
                     "assembly_stage": assembly,
                     "rank": rank,
-                    "zero_rank": zero_rank,
+                    "pin_rank": pin_rank,
+                    "pin_value": pin_value,
                 }
             )
     return rows
@@ -101,7 +106,8 @@ def test_doc_and_registry_attributes_match():
         assert spec.assembly_stage == row["assembly_stage"], row["name"]
         if spec.kind == "numeric":
             assert spec.rank == row["rank"], row["name"]
-            assert spec.zero_rank == row["zero_rank"], row["name"]
+            assert spec.pin_rank == row["pin_rank"], row["name"]
+            assert spec.pin_value == row["pin_value"], row["name"]
 
 
 def test_flags_and_classification_are_never_ranked():
@@ -113,7 +119,7 @@ def test_flags_and_classification_are_never_ranked():
 
 def test_rank_policy_adr_0016():
     """Integer-valued composites, counts and shares are never ranked; the
-    documented mass-point features are zero-pinned with the documented pin."""
+    documented mass-point features are pinned at the documented value/rank."""
     by_name = {s.name: s for s in FEATURES}
     unranked = {
         "fundamentals_age_days", "piotroski_f", "mohanram_g7",
@@ -126,13 +132,22 @@ def test_rank_policy_adr_0016():
     } | {f"ocf_positive_frac_{w}q" for w in (4, 8, 12, 20)}
     assert {s.name for s in FEATURES if s.kind == "numeric" and s.rank == "none"} == unranked
 
-    pinned = {
-        "sales_yield": 0.0, "dividend_yield": 0.0, "net_payout_yield": 0.5,
-        "asset_turnover": 0.0, "share_count_growth_1y": 0.5,
-        "debt_to_equity": 0.0, "ext_financing_to_assets": 0.5,
-        "rnd_to_assets": 0.0, "capex_to_assets": 0.0, "dist_52w_high": 1.0,
+    pinned = {  # name: (pin_value, pin_rank)
+        "sales_yield": (0.0, 0.0), "dividend_yield": (0.0, 0.0),
+        "net_payout_yield": (0.0, 0.5), "asset_turnover": (0.0, 0.0),
+        "share_count_growth_1y": (0.0, 0.5), "debt_to_equity": (0.0, 0.0),
+        "ext_financing_to_assets": (0.0, 0.5), "rnd_to_assets": (0.0, 0.0),
+        "capex_to_assets": (0.0, 0.0), "dist_52w_high": (0.0, 1.0),
+        "gp_to_assets": (0.0, 0.5), "asset_turnover_delta_1y": (0.0, 0.5),
+        "ni_change_scaled": (0.0, 0.5), "gross_margin_delta_1y": (0.0, 0.5),
+        "gross_margin_delta_2y": (0.0, 0.5), "ret_1m": (0.0, 0.5),
+        # masses at raw 1: no cost of revenue / unchanged margin / no net debt
+        "gross_margin": (1.0, 1.0), "gmi": (1.0, 0.5),
+        "ev_to_marketcap": (1.0, 0.5),
     }
-    assert {s.name: s.zero_rank for s in FEATURES if s.rank == "pinned_zero"} == pinned
+    assert {
+        s.name: (s.pin_value, s.pin_rank) for s in FEATURES if s.rank == "pinned"
+    } == pinned
     # Everything else numeric is a full percent rank.
     for spec in FEATURES:
         if spec.kind == "numeric" and spec.name not in unranked | set(pinned):
@@ -144,7 +159,9 @@ def test_rank_policy_adr_0016():
     with pytest.raises(ValueError):
         FeatureSpec("x", "meta", "T0", "flag", "d", rank="full")
     with pytest.raises(ValueError):
-        FeatureSpec("x", "valuation", "T0", "numeric", "d", zero_rank=0.5)
+        FeatureSpec("x", "valuation", "T0", "numeric", "d", pin_rank=0.5)
+    with pytest.raises(ValueError):
+        FeatureSpec("x", "valuation", "T0", "numeric", "d", pin_value=1.0)
 
 
 def test_sector_rank_allowlist_matches_adr_0008():

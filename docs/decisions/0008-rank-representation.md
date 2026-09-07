@@ -4,7 +4,7 @@ Date: 2026-07-14
 Status: accepted; §2 ("`{feature}_rank`" for every numeric) and §4
 ("composites are ranked like any other numeric feature") amended by
 [0016](0016-rank-quarter-keys.md) — integer-valued composites, counts and
-shares are not ranked, mass-point features get a zero-pinned rank, and
+shares are not ranked, mass-point features get a pinned rank, and
 every build is audited for calendar-quarter keys. The mechanics below are
 otherwise unchanged.
 

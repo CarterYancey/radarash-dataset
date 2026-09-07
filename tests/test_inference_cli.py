@@ -267,7 +267,7 @@ def test_ranks_over_the_inference_cross_section(inference_world):
 
 def test_conservative_score(inference_world):
     # Constant prices: vol_36m and mom_12_2 rank 0 everywhere. Net payout
-    # yield 0.01 / 0.02 / 0.03 is zero-pinned at 0.5 (ADR 0016, same policy
+    # yield 0.01 / 0.02 / 0.03 is pinned at 0 -> 0.5 (ADR 0016, same policy
     # as training) -> 0.5 / 0.75 / 1 -> conservative = 1 + npy_rank,
     # ranked 0 / 0.5 / 1.
     assert query(
@@ -322,7 +322,7 @@ def test_manifest(inference_world):
     assert manifest["rows_with_stale_price"] == 1  # MTWO
     assert manifest["columns"]["features"] == list(feature_columns_in_order())
     assert manifest["rank_policy"]["dividend_yield"] == {
-        "rank": "pinned_zero", "zero_rank": 0.0,
+        "rank": "pinned", "pin_value": 0.0, "pin_rank": 0.0,
     }
     assert "labels" not in manifest["columns"]
     assert set(manifest["input_rows"]) == {"SF1", "SEP", "mapping", "universe"}
