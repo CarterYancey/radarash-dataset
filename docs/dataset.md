@@ -50,14 +50,14 @@ docs/features.md notes):
 |---|---|---|
 | `full` | `_rank` (+ `_secrank` if allowlisted) | the percent rank above; continuous features |
 | `pinned` (mass at raw *v*, rank *r*) | same | rows at exactly *v* rank *r* in every quarter; the rest are percent-ranked within their side of the pin, below onto [0, *r*], above onto [*r*, 1] — the mass's rank is a fixed constant, not the quarter's share below it |
-| `none` | no rank columns | integer-valued composites, counts and shares (`piotroski_f`, `mohanram_g7`, `fundamentals_age_days`, `fund_history_quarters`, `div_*_10y`, `*_up_frac_*`, `ocf_positive_frac_*`): the raw score is already cross-sectionally comparable |
+| `none` | no rank columns | integer-valued composites, counts and shares (`piotroski_f`, `mohanram_g7`, `fundamentals_age_days`, `fund_history_quarters`, `div_*_10y`, `*_up_frac_*`, `ocf_positive_frac_*`) and the bounded `ni_change_scaled` (masses at ±1 on every sign flip): the raw score is already cross-sectionally comparable |
 
 Pins in v1.2 (mass at raw 0 unless stated): rank 0 for `dividend_yield`,
 `rnd_to_assets`, `capex_to_assets`, `debt_to_equity`, `sales_yield`,
 `asset_turnover`; rank 0.5 for the signed `net_payout_yield`,
 `ext_financing_to_assets`, `share_count_growth_1y`, `gp_to_assets`,
 `asset_turnover_delta_1y`, `gross_margin_delta_1y`, `gross_margin_delta_2y`,
-`ni_change_scaled`, `ret_1m`; rank 1 for `dist_52w_high` (≤ 0, zero = at
+`ret_1m`; rank 1 for `dist_52w_high` (≤ 0, zero = at
 the 52-week high); mass at raw **1**: `gross_margin` (rank 1 — no cost of
 revenue reported), `gmi` and `ev_to_marketcap` (rank 0.5).
 

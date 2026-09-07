@@ -59,7 +59,11 @@ cross-section.
      `mohanram_g7`, `fundamentals_age_days` (integer days),
      `fund_history_quarters`, the four `div_*_10y` counters, the twelve
      `*_up_frac_{w}q` and four `ocf_positive_frac_{w}q` shares (at most
-     w+1 values). The raw score is already cross-sectionally comparable; a
+     w+1 values) — and `ni_change_scaled`, which is bounded to [−1, 1] and
+     sits at exactly +1 / −1 for every loss→profit / profit→loss flip (a
+     fifth of the cross-section in 2010-Q4): two masses cannot be pinned,
+     and the raw value is a fixed-scale score already (Ohlson's CHIN
+     term). The raw score is already cross-sectionally comparable; a
      fixed-scale [0, 1] version (`piotroski_f / 9`) is a downstream
      one-liner if wanted, and is deliberately **not** shipped as a column —
      it would be redundant with the raw score.
@@ -82,8 +86,8 @@ cross-section.
        (unchanged share count), and — found by the first real-data audit
        run, 2026-09-07 — `gp_to_assets` (pre-revenue firms, gross profit
        exactly 0), `asset_turnover_delta_1y`, `gross_margin_delta_1y`,
-       `gross_margin_delta_2y`, `ni_change_scaled` (unchanged YoY) and
-       `ret_1m` (no price change in a month) — signed supports, negatives
+       `gross_margin_delta_2y` (unchanged YoY) and `ret_1m` (no price
+       change in a month) — signed supports, negatives
        below the pin, positives above;
      - mass at 0, rank **1**: `dist_52w_high` (≤ 0 by construction; a
        stock at its 52-week high is the top of the cross-section, and a
@@ -139,7 +143,7 @@ cross-section.
    brief's option (b), on top of (a).
 
 3. **Dataset v1.2, a breaking change.** Rank column semantics change for
-   19 features and 24 rank columns disappear, so results must not be
+   18 features and 25 rank columns disappear, so results must not be
    compared across the v1.1 → v1.2 boundary; rank-fed downstream configs
    need a `min_dataset_version` bump. `sharadar-assemble` defaults to
    `1.2`. The inference dataset (decision 0014) uses the same
@@ -174,8 +178,10 @@ cross-section.
   flagged eleven more columns (worst: `ni_change_scaled` 20%,
   `gp_to_assets` 19%, `asset_turnover_delta_1y` 14%, the gross-margin
   family 6–8%, `ret_1m` and `ev_to_marketcap` ~2–3%), which is where the
-  mass-at-1 pins come from. A flagged column means "declare its policy",
-  not "raise the threshold".
+  mass-at-1 pins come from; the second run located `ni_change_scaled`'s
+  mass at raw +1 (a sign flip, not "unchanged"), which is why it is
+  unranked rather than pinned. A flagged column means "declare its
+  policy", not "raise the threshold".
 - The leakage-gap experiment (decision 0010) and the era probe become
   meaningful for rank-fed models; their downstream registrations stand.
 - Cost: 24 fewer rank columns; ~113 extra column-pruned scans of the

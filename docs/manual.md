@@ -73,7 +73,8 @@ policy, published in `manifest.json["rank_policy"]`:
 - **Integer scores, counts and shares have no rank column** —
   `piotroski_f`, `mohanram_g7`, `fundamentals_age_days`,
   `fund_history_quarters`, the `div_*_10y` counters, `*_up_frac_*`,
-  `ocf_positive_frac_*`. Use the raw column; it is already comparable
+  `ocf_positive_frac_*`, and the bounded `ni_change_scaled` (it sits at
+  exactly ±1 on every loss/profit flip). Use the raw column; it is already comparable
   across quarters. Do not rank them yourself within quarter — you would
   rebuild the key.
 - **Pinned ranks** (`{"rank": "pinned", "pin_value": v, "pin_rank": r}`):
@@ -94,7 +95,7 @@ group (`max_key_share`); a shipped version has an empty
 `rank_audit.flagged` unless upstream published under `--allow-rank-keys`,
 in which case exclude the listed columns from rank-fed models.
 
-**v1.1 → v1.2 is a breaking boundary**: 24 rank columns disappear and 19
+**v1.1 → v1.2 is a breaking boundary**: 25 rank columns disappear and 18
 change semantics. Do not compare rank-fed results across it; bump
 `min_dataset_version` on rank-fed configs. Raw columns and flags are
 unchanged.

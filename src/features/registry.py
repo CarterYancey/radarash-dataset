@@ -198,7 +198,7 @@ FEATURES: tuple[FeatureSpec, ...] = (
     _f("interest_coverage", "solvency", "T0", "numeric", "ebit / intexp"),
     _f("ffo_to_liabilities", "solvency", "T0", "numeric", "ncfo / liabilities_q"),
     _f("log_assets", "solvency", "T0", "numeric", "ln(assets_q)"),
-    _f("ni_change_scaled", "solvency", "T1", "numeric", "(netinc - netinc[-1]) / (|netinc| + |netinc[-1]|)", rank="pinned", pin_rank=0.5),
+    _f("ni_change_scaled", "solvency", "T1", "numeric", "(netinc - netinc[-1]) / (|netinc| + |netinc[-1]|)", rank="none"),
     _f("two_year_loss", "solvency", "T1", "flag", "netinc < 0 AND netinc[-1] < 0"),
     _f("liab_gt_assets", "solvency", "T0", "flag", "liabilities_q > assets_q"),
     _f("altman_z", "solvency", "T0", "numeric", "1.2 wc/ta + 1.4 re/ta + 3.3 ebit/ta + 0.6 mve/tl + 1.0 s/ta"),

@@ -124,7 +124,7 @@ def test_rank_policy_adr_0016():
     unranked = {
         "fundamentals_age_days", "piotroski_f", "mohanram_g7",
         "fund_history_quarters", "div_years_paid_10y", "div_streak_10y",
-        "div_cuts_10y", "div_history_years_10y",
+        "div_cuts_10y", "div_history_years_10y", "ni_change_scaled",
     } | {
         f"{series}_up_frac_{w}q"
         for series in ("revenue", "tangibles", "ocf")
@@ -139,7 +139,7 @@ def test_rank_policy_adr_0016():
         "ext_financing_to_assets": (0.0, 0.5), "rnd_to_assets": (0.0, 0.0),
         "capex_to_assets": (0.0, 0.0), "dist_52w_high": (0.0, 1.0),
         "gp_to_assets": (0.0, 0.5), "asset_turnover_delta_1y": (0.0, 0.5),
-        "ni_change_scaled": (0.0, 0.5), "gross_margin_delta_1y": (0.0, 0.5),
+        "gross_margin_delta_1y": (0.0, 0.5),
         "gross_margin_delta_2y": (0.0, 0.5), "ret_1m": (0.0, 0.5),
         # masses at raw 1: no cost of revenue / unchanged margin / no net debt
         "gross_margin": (1.0, 1.0), "gmi": (1.0, 0.5),

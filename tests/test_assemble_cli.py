@@ -468,7 +468,8 @@ def test_integer_valued_features_are_not_ranked(assembled_world):
     unranked = [s.name for s in FEATURES if s.kind == "numeric" and not s.ranked]
     assert {"piotroski_f", "mohanram_g7", "fund_history_quarters",
             "fundamentals_age_days", "revenue_up_frac_4q",
-            "ocf_positive_frac_20q", "div_streak_10y"} <= set(unranked)
+            "ocf_positive_frac_20q", "div_streak_10y",
+            "ni_change_scaled"} <= set(unranked)
     for name in unranked:
         assert name in emitted, name
         assert f"{name}_rank" not in emitted, name

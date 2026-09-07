@@ -217,7 +217,7 @@ dividend year ⇒ the dividend counters are NULL.
 | `interest_coverage` | T0 | `ebit / intexp` | NULL if `intexp ≤ 0` (no debt ⇒ NULL, not ∞) |
 | `ffo_to_liabilities` | T0 | `ncfo / liabilities_q` | O component (FFO proxied by CFO, §F1 gap) |
 | `log_assets` | T0 | `ln(assets_q)` | O size term (nominal; rank fixes drift) |
-| `ni_change_scaled` | T1 | `(netinc − netinc₋₁) / (|netinc| + |netinc₋₁|)` | O component; pinned rank (0.5) — signed, unchanged net income at 0.5 |
+| `ni_change_scaled` | T1 | `(netinc − netinc₋₁) / (|netinc| + |netinc₋₁|)` | O component; not ranked — bounded [−1, 1] with masses at ±1 (every loss→profit / profit→loss flip), a fixed-scale score already (ADR 0016) |
 | `two_year_loss` | T1 | `netinc < 0 AND netinc₋₁ < 0` | flag; O component |
 | `liab_gt_assets` | T0 | `liabilities_q > assets_q` | flag; O component |
 | `altman_z` | T0 ⌂⌐ | `1.2·wc/ta + 1.4·re/ta + 3.3·ebit/ta + 0.6·mve/tl + 1.0·s/ta` | composite; literature comparability |
