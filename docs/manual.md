@@ -106,7 +106,10 @@ sales, book, tangible book) against the stock's *own* last 20 quarters
 (`*_vs_5y_median`, ranked; `*_5y_pctile`, raw only — prefer it for the
 sign-changing earnings/cash-flow yields, whose median ratio is NULL when
 the historical median is ≤ 0). NULL for stocks without ~3 years of
-priced history — keep the NULLs. They answer "cheap for *this* stock", which the
+priced history — keep the NULLs. The technical family gains the matching
+price-only anchors (decision 0019): `dist_5y_high`, `price_vs_5y_avg`
+(NULL under ~4 years of prints), `mom_36_12`, plus `max_ret_21d` and
+`beta_12m`. They answer "cheap for *this* stock", which the
 cross-sectional ranks cannot; pair them with the level ranks rather than
 replacing them.
 

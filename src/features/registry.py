@@ -55,7 +55,7 @@ class FeatureSpec:
 
     name: str
     family: str
-    tier: str | None  # T0-T3 / P12 / P36 (ADR 0004), T5 / T10 (ADR 0015); None for classification
+    tier: str | None  # T0-T3 / P12 / P36 (ADR 0004), T5 / T10 (ADR 0015), P60 (ADR 0019); None for classification
     kind: str
     definition: str
     rank: str = "full"  # one of RANK_POLICIES; forced to "none" for non-numeric kinds
@@ -238,11 +238,16 @@ FEATURES: tuple[FeatureSpec, ...] = (
     _f("mohanram_g7", "quality", "T3", "numeric", "7-signal G-score vs. famaindustry medians", rank="none", assembly_stage=True),
     # ---- technical (from SEP; differs across snapshot kinds) ----------------
     _f("mom_12_2", "technical", "P12", "numeric", "total return t-252 -> t-21"),
+    _f("mom_36_12", "technical", "P36", "numeric", "total return t-756 -> t-252 (long-term reversal)", added_in_version="1.3"),
     _f("ret_6m", "technical", "P12", "numeric", "total return t-126 -> t"),
     _f("ret_1m", "technical", "P12", "numeric", "total return t-21 -> t", rank="pinned", pin_rank=0.5),
+    _f("max_ret_21d", "technical", "P12", "numeric", "max one-day return over the last 21 trading days, >=15 obs", rank="pinned", pin_rank=0.0, added_in_version="1.3"),
     _f("vol_12m", "technical", "P12", "numeric", "ann. sigma of daily log returns, >=200 obs"),
     _f("vol_36m", "technical", "P36", "numeric", "ann. sigma over 756d, >=600 obs"),
+    _f("beta_12m", "technical", "P12", "numeric", "regr_slope of daily log returns on SPY's, 252d, >=200 obs", added_in_version="1.3"),
     _f("dist_52w_high", "technical", "P12", "numeric", "closeadj / max_252d closeadj - 1", rank="pinned", pin_rank=1.0),
+    _f("dist_5y_high", "technical", "P60", "numeric", "closeadj / max_1260d closeadj - 1, >=1000 obs", rank="pinned", pin_rank=1.0, added_in_version="1.3"),
+    _f("price_vs_5y_avg", "technical", "P60", "numeric", "closeadj / mean_1260d closeadj - 1, >=1000 obs", added_in_version="1.3"),
     _f("log_marketcap", "technical", "T0", "numeric", "ln(marketcap)"),
     _f("dollar_volume_3m", "technical", "P12", "numeric", "median daily close*volume, t-63 -> t"),
     _f("amihud_12m", "technical", "P12", "numeric", "mean |ret| / (close*volume)"),

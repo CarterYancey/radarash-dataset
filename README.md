@@ -39,7 +39,7 @@ All data comes from **Sharadar via Nasdaq Data Link**:
 |---|---|---|
 | `SF1` | Fundamentals (quarterly/annual/TTM, multiple dimensions) | Features |
 | `SEP` | Equity prices, daily, incl. `closeadj` | Labels, price-based features |
-| `SFP` | Fund prices (SPY etc.) | Benchmark labels |
+| `SFP` | Fund prices (SPY etc.) | Benchmark labels, market beta |
 | `TICKERS` | Metadata: permaticker, category, sector/industry, isdelisted, SIC, FF industry | Universe definition, identifier mapping |
 | `ACTIONS` / `EVENTS` | Corporate actions, delisting events | Delisting-return conventions |
 | `DAILY` | Daily-computed metrics (marketcap, ev, pe, pb, ps) | Convenience features |

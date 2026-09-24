@@ -14,7 +14,12 @@ Everything downstream works from these temp views:
 - `snapshots`          — the labels module's snapshot rows, verbatim.
 - `sep_ix`             — permaticker-resolved daily prices (close, closeadj,
                          volume) on the dense trading-calendar index, with
-                         per-stock daily returns for the technical family.
+                         per-stock daily returns for the technical family
+                         (`prev_ix` = the calendar index of the print each
+                         return starts from; `prev_ix = ix - 1` marks a
+                         true one-day return).
+- `benchmark_ix`       — the benchmark's (SFP SPY) daily log returns on
+                         the same calendar index, for market beta.
 - `trading_calendar`   — market trading calendar (distinct SEP dates).
 - `universe`, `price_mapping` — identity artifacts, verbatim.
 
@@ -32,6 +37,7 @@ from pathlib import Path
 import duckdb
 
 from identity.source import sql_quote
+from labels.source import BENCHMARK_TICKER
 
 logger = logging.getLogger(__name__)
 
@@ -86,6 +92,8 @@ def create_feature_source_views(
     mapping_parquet: Path,
     universe_parquet: Path,
     snapshots_parquet: Path | None,
+    sfp_parquet: Path,
+    benchmark_ticker: str = BENCHMARK_TICKER,
 ) -> None:
     """Create the source temp views over the raw and interim parquet files.
 
@@ -213,6 +221,7 @@ def create_feature_source_views(
         CREATE OR REPLACE TEMP VIEW sep_ix AS
         SELECT m.permaticker, p.date, c.ix, p.close, p.closeadj, p.volume,
                p.close * p.volume AS dollar_volume,
+               lag(c.ix) OVER w AS prev_ix,
                p.closeadj / lag(p.closeadj) OVER w - 1 AS ret_1d,
                ln(p.closeadj / lag(p.closeadj) OVER w) AS logret_1d
         FROM read_parquet({sql_quote(str(sep_parquet))}) p
@@ -224,5 +233,20 @@ def create_feature_source_views(
         JOIN trading_calendar c ON c.date = p.date
         WHERE p.closeadj IS NOT NULL AND p.closeadj > 0
         WINDOW w AS (PARTITION BY m.permaticker ORDER BY c.ix)
+        """
+    )
+    # Same benchmark and adjusted-close convention as the labels module
+    # (labels/source.py `benchmark_prices`).
+    con.execute(
+        f"""
+        CREATE OR REPLACE TEMP VIEW benchmark_ix AS
+        SELECT c.ix,
+               lag(c.ix) OVER w AS prev_ix,
+               ln(b.closeadj / lag(b.closeadj) OVER w) AS logret_1d
+        FROM read_parquet({sql_quote(str(sfp_parquet))}) b
+        JOIN trading_calendar c ON c.date = b.date
+        WHERE b.ticker = {sql_quote(benchmark_ticker)}
+          AND b.closeadj IS NOT NULL AND b.closeadj > 0
+        WINDOW w AS (ORDER BY c.ix)
         """
     )

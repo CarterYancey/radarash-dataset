@@ -196,6 +196,10 @@ merely low-multiple" signal the models are missing.
 
 ### 2.2 Cheap price-only variants (do these regardless)
 
+*(Graduated: all five shipped in the technical family, dataset v1.3 →
+`decisions/0019` — the 5y anchors need ≥ 1000 prints (tier P60), and MAX
+and beta use true one-day returns only; beta is `beta_12m` vs. SPY.)*
+
 Price history needs no fundamentals matching, so these are near-free in the
 technical family and carry much of the same signal:
 

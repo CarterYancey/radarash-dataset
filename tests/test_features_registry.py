@@ -147,6 +147,7 @@ def test_rank_policy_adr_0016():
         "gross_margin_delta_1y": (0.0, 0.5),
         "gross_margin_delta_2y": (0.0, 0.5), "ret_1m": (0.0, 0.5),
         "sales_yield_vs_5y_median": (0.0, 0.0),
+        "max_ret_21d": (0.0, 0.0), "dist_5y_high": (0.0, 1.0),
         # masses at raw 1: no cost of revenue / unchanged margin / no net debt
         "gross_margin": (1.0, 1.0), "gmi": (1.0, 0.5),
         "ev_to_marketcap": (1.0, 0.5),

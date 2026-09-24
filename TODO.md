@@ -77,6 +77,10 @@ era-identifiability probe) live on its task list, not here.
       continuity across ACTIONS splits (affects ADR 0007 marketcap and the
       ADR 0018 historical buckets); if as-of-day, NULL relvalue buckets
       with a split between share-count date and price anchor.
+- [x] **M4 — Features.** Long-window price features in the technical
+      family: `dist_5y_high`, `price_vs_5y_avg`, `mom_36_12`,
+      `max_ret_21d`, `beta_12m` (SFP now a features/inference input)
+      → `docs/decisions/0019`; dataset version 1.3.
 - [x] **M4 — Features.** Trend & consistency family (long-horizon financial
       health: revenue/tangibles/OCF trends over 4/8/12/20-quarter windows,
       10-year dividend record) → `docs/decisions/0015`; dataset version

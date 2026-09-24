@@ -54,11 +54,12 @@ docs/features.md notes):
 
 Pins in v1.2 (mass at raw 0 unless stated): rank 0 for `dividend_yield`,
 `rnd_to_assets`, `capex_to_assets`, `debt_to_equity`, `sales_yield`,
-`asset_turnover` (and, from v1.3, `sales_yield_vs_5y_median`); rank 0.5 for the signed `net_payout_yield`,
+`asset_turnover` (and, from v1.3, `sales_yield_vs_5y_median`,
+`max_ret_21d`); rank 0.5 for the signed `net_payout_yield`,
 `ext_financing_to_assets`, `share_count_growth_1y`, `gp_to_assets`,
 `asset_turnover_delta_1y`, `gross_margin_delta_1y`, `gross_margin_delta_2y`,
-`ret_1m`; rank 1 for `dist_52w_high` (≤ 0, zero = at
-the 52-week high); mass at raw **1**: `gross_margin` (rank 1 — no cost of
+`ret_1m`; rank 1 for `dist_52w_high` and (v1.3)
+`dist_5y_high` (≤ 0, zero = at the high); mass at raw **1**: `gross_margin` (rank 1 — no cost of
 revenue reported), `gmi` and `ev_to_marketcap` (rank 0.5).
 
 ### Rank audit (ADR 0016)

@@ -7,6 +7,7 @@ Inputs (produced by `sharadar-ingest`, `sharadar-identity`, `sharadar-labels`):
 
     data/raw/SF1.parquet                  as-reported fundamentals
     data/raw/SEP.parquet                  daily prices
+    data/raw/SFP.parquet                  benchmark (SPY) prices, market beta
     data/interim/ticker_permaticker.parquet
     data/interim/universe.parquet
     data/interim/snapshots.parquet
@@ -99,6 +100,7 @@ def main(argv: list[str] | None = None) -> int:
     inputs = {
         "SF1 fundamentals (run `sharadar-ingest --tables SF1`)": raw_dir / "SF1.parquet",
         "SEP prices (run `sharadar-ingest --tables SEP`)": raw_dir / "SEP.parquet",
+        "SFP prices (run `sharadar-ingest --tables SFP`)": raw_dir / "SFP.parquet",
         "mapping (run `sharadar-identity`)": interim_dir / "ticker_permaticker.parquet",
         "universe (run `sharadar-identity`)": interim_dir / "universe.parquet",
         "snapshots (run `sharadar-labels`)": interim_dir / "snapshots.parquet",
@@ -128,6 +130,7 @@ def main(argv: list[str] | None = None) -> int:
             mapping_parquet=interim_dir / "ticker_permaticker.parquet",
             universe_parquet=interim_dir / "universe.parquet",
             snapshots_parquet=interim_dir / "snapshots.parquet",
+            sfp_parquet=raw_dir / "SFP.parquet",
         )
         build_fund_base_view(con)
         build_fund_history_view(con)

@@ -9,7 +9,8 @@
 [0008](decisions/0008-rank-representation.md) (ranks),
 [0015](decisions/0015-trend-consistency-features.md) (trend & consistency, v1.1),
 [0016](decisions/0016-rank-quarter-keys.md) (per-feature rank policy, v1.2),
-[0018](decisions/0018-relative-value-features.md) (relative value, v1.3).
+[0018](decisions/0018-relative-value-features.md) (relative value, v1.3),
+[0019](decisions/0019-long-window-price-features.md) (long-window price features, v1.3).
 `src/features/` implements this registry in the build order below.
 Research trail: [research/features.md](research/features.md).
 
@@ -58,8 +59,8 @@ versions diffable from the registry alone.
   ranked. Assembly audits every rank column for calendar-quarter keys and
   refuses a build that carries one (dataset.md).
 - **Tiers** (ADR 0004): T0 current filing; T1/T2/T3 = +1/2/3 fiscal years;
-  P12/P36 = 252/756 trading days of `SEP.closeadj`; T5/T10 = +20 quarters /
-  +10 fiscal years (ADR 0015). Tier = what the feature *needs*; unmet ⇒
+  P12/P36/P60 = 252/756/1260 trading days of `SEP.closeadj` (P60: ADR 0019);
+  T5/T10 = +20 quarters / +10 fiscal years (ADR 0015). Tier = what the feature *needs*; unmet ⇒
   NULL — except the windowed trend family, whose tier states the full
   window while partial histories degrade per its min-count rules.
 - **Quarterly/annual history windows** (ADR 0015): the lag-q (lag-y)
@@ -290,11 +291,16 @@ composite is deferred (ADR 0003) — its components are all above.
 | column | tier | definition | notes |
 |---|---|---|---|
 | `mom_12_2` | P12 | total return t−252 → t−21 | S is not applied; plain rank only |
+| `mom_36_12` | P36 | total return t−756 → t−252 | long-term reversal (De Bondt–Thaler): 3y return excluding the last year; added v1.3 |
 | `ret_6m` | P12 | total return t−126 → t | |
 | `ret_1m` | P12 | total return t−21 → t | short-term reversal; pinned rank (0.5) — no price change at 0.5 |
+| `max_ret_21d` | P12 | max one-day `closeadj` return over the last 21 trading days | lottery/MAX factor; true one-day returns only, ≥ 15 of them; pinned rank (0) — no up day; added v1.3 |
 | `vol_12m` | P12 | ann. σ of daily log returns, ≥200 obs | |
 | `vol_36m` | P36 | same over 756d, ≥600 obs | Conservative-formula input |
+| `beta_12m` | P12 | `regr_slope` of daily log returns on the benchmark's (SFP `SPY` `closeadj`), last 252d | days where both moved one trading day only, ≥ 200 pairs; plain daily beta (thin traders bias it toward 0); added v1.3 |
 | `dist_52w_high` | P12 | `closeadj / max₍t−252…t₎ closeadj − 1` | ≤ 0; pinned rank (1) — at the 52-week high sits at the top |
+| `dist_5y_high` | P60 | `closeadj / max₍t−1260…t₎ closeadj − 1` | the stock's own 5y drawdown at entry; ≥ 1000 prints in-window, else NULL (a young listing has no 5y high); ≤ 0; pinned rank (1); added v1.3 |
+| `price_vs_5y_avg` | P60 | `closeadj / mean₍t−1260…t₎ closeadj − 1` | slow mean-reversion anchor; ≥ 1000 prints; added v1.3 |
 | `log_marketcap` | T0 | `ln(marketcap)` | |
 | `dollar_volume_3m` | P12 | median daily `close × volume`, t−63 → t | liquidity column (TODO microcap question) |
 | `amihud_12m` | P12 | mean `|ret| / (close × volume)` | illiquidity |
