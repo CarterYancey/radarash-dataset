@@ -8,7 +8,8 @@
 [0007](decisions/0007-market-inputs-daily-pit.md) (market inputs),
 [0008](decisions/0008-rank-representation.md) (ranks),
 [0015](decisions/0015-trend-consistency-features.md) (trend & consistency, v1.1),
-[0016](decisions/0016-rank-quarter-keys.md) (per-feature rank policy, v1.2).
+[0016](decisions/0016-rank-quarter-keys.md) (per-feature rank policy, v1.2),
+[0018](decisions/0018-relative-value-features.md) (relative value, v1.3).
 `src/features/` implements this registry in the build order below.
 Research trail: [research/features.md](research/features.md).
 
@@ -198,6 +199,28 @@ dividend year ⇒ the dividend counters are NULL.
 | `div_cuts_10y` | T10 | YoY TTM dividend drops below 0.8× prior, last 10y | omission counts as a cut; not ranked (count) |
 | `div_history_years_10y` | T10 | annual dividend observations known, last 10 | denominator context; not ranked (count) |
 
+## Relative value (ADR 0018; added in v1.3)
+
+Valuation against the stock's **own** past, not the cross-section: is it
+cheaper than *it* usually is? Each quarterly history bucket (the 20q
+`fund_history` window above, qoff 0…19) is priced at its own historical
+market cap — `close × sharesbas × sharefactor` of that bucket's filing
+(ADR 0007 convention, no DAILY), with `close` the unadjusted SEP close on
+the last trading day on or before the anchor `least(datekey,
+reportperiod + 45d)`, NULL when that print is more than 14 days older than
+the anchor (pre-listing history, halts). The anchor never passes the
+bucket filing's `datekey`, so every input is public at the snapshot. The
+current value is the snapshot-date valuation ratio (Valuation above).
+Both statistics need ≥ 11 priced historical values (ADR 0015's 20q rule)
+and a current value; missing stays NULL.
+
+| column | tier | definition | notes |
+|---|---|---|---|
+| `sales_yield_vs_5y_median` | T5 | `sales_yield / median(historical sales_yield)` | > 1 ⇒ cheaper than its own norm; NULL if the median ≤ 0; pinned rank (0) — revenue gone to zero |
+| `sales_yield_5y_pctile` | T5 | `(#hist < cur + ½·#hist = cur) / n` over the historical `sales_yield` values | 1 ⇒ cheaper than every past bucket; not ranked (share) |
+| `book_to_market_vs_5y_median` | T5 | `book_to_market / median(historical book_to_market)` | NULL if the median ≤ 0; negative current book kept (sign of the numerator) |
+| `book_to_market_5y_pctile` | T5 | same midrank percentile over historical `book_to_market` | not ranked (share) |
+
 ## Solvency / distress
 
 | column | tier | definition | notes |
@@ -287,7 +310,7 @@ diff once two ingest vintages exist.
 
 `base` (as-of + lag resolution), `history` (quarterly/annual buckets,
 ADR 0015) and `market` (marketcap/EV) → `valuation` →
-`profitability` + `growth` → `trend` → `solvency` → `quality` →
+`profitability` + `growth` → `trend` → `relvalue` → `solvency` → `quality` →
 `technical` → `classification`; then assembly (M5, `src/assemble/`) computes
 ranks/sector-ranks under each feature's rank policy (ADR 0016), the two
 assembly-stage columns (`mohanram_g7`, `conservative_score`, ADR 0013) and

@@ -23,6 +23,7 @@ FAMILIES: tuple[str, ...] = (
     "profitability",
     "growth",
     "trend",
+    "relvalue",
     "solvency",
     "quality",
     "technical",
@@ -182,6 +183,11 @@ FEATURES: tuple[FeatureSpec, ...] = (
     _f("div_streak_10y", "trend", "T10", "numeric", "consecutive paying years ending now, max 10", rank="none", added_in_version="1.1"),
     _f("div_cuts_10y", "trend", "T10", "numeric", "YoY TTM dividend drops below 0.8x prior, last 10y", rank="none", added_in_version="1.1"),
     _f("div_history_years_10y", "trend", "T10", "numeric", "annual dividend observations known, last 10", rank="none", added_in_version="1.1"),
+    # ---- relative value (ADR 0018; vs. the stock's own 20q history) -------
+    _f("sales_yield_vs_5y_median", "relvalue", "T5", "numeric", "sales_yield / median of its 20q historical values", rank="pinned", pin_rank=0.0, added_in_version="1.3"),
+    _f("sales_yield_5y_pctile", "relvalue", "T5", "numeric", "midrank percentile of sales_yield within its 20q history", rank="none", added_in_version="1.3"),
+    _f("book_to_market_vs_5y_median", "relvalue", "T5", "numeric", "book_to_market / median of its 20q historical values", added_in_version="1.3"),
+    _f("book_to_market_5y_pctile", "relvalue", "T5", "numeric", "midrank percentile of book_to_market within its 20q history", rank="none", added_in_version="1.3"),
     # ---- solvency / distress ----------------------------------------------
     _f("wc_to_assets", "solvency", "T0", "numeric", "workingcapital_q / assets_q"),
     _f("retearn_to_assets", "solvency", "T0", "numeric", "retearn_q / assets_q"),

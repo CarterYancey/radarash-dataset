@@ -99,6 +99,8 @@ Categories (initial set; research workspace in `docs/research/features.md`,
 final registry in `docs/features.md`):
 
 1. **Valuation:** P/B, P/S, P/E, EV/EBITDA, EV/EBIT, earnings yield, FCF yield. Piotroski F-score, Magic formula, Conservative formula, etc.
+   Also valuation against the stock's *own* 5-year history (cheap for this
+   stock, not just vs. the cross-section — decision 0018).
 2. **Solvency / distress (Altman-Z-style, Ohlson O-score, etc):** working capital / assets,
    retained earnings / assets, EBIT / assets, market equity / total liabilities,
    sales / assets; debt/equity, interest coverage, current ratio.

@@ -35,6 +35,7 @@ from .output import write_family_table
 from .profitability import build_profitability_view
 from .quality import build_quality_view
 from .registry import FAMILIES
+from .relvalue import build_relvalue_view
 from .solvency import build_solvency_view
 from .source import check_sf1_fields, create_feature_source_views
 from .technical import build_technical_view
@@ -49,6 +50,7 @@ FAMILY_BUILDERS = {
     "profitability": build_profitability_view,
     "growth": build_growth_view,
     "trend": build_trend_view,
+    "relvalue": build_relvalue_view,
     "solvency": build_solvency_view,
     "quality": build_quality_view,
     "technical": build_technical_view,

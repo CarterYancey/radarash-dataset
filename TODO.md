@@ -63,10 +63,14 @@ era-identifiability probe) live on its task list, not here.
 - [ ] **Training-outcomes improvement backlog** — prioritized review in
       `docs/research/dataset-improvements.md` (2026-08-27): top items are
       the V1/V6/V4 verifications, a valuation-vs-own-history feature
-      family, path-dependent labels (max drawdown + interim low
+      family (done → ADR 0018), path-dependent labels (max drawdown + interim low
       done → ADR 0017; triple-barrier still deferred), Ohlson O-score + magic-formula composite
       + F-score component flags, and trend-family extensions (share count,
       margins). Each graduates via its own ADR.
+- [x] **M4 — Features.** Relative-value family: `sales_yield` /
+      `book_to_market` vs. the stock's own 20-quarter history
+      (`*_vs_5y_median`, `*_5y_pctile`), historical market cap priced per
+      `fund_history` bucket → `docs/decisions/0018`; dataset version 1.3.
 - [x] **M4 — Features.** Trend & consistency family (long-horizon financial
       health: revenue/tangibles/OCF trends over 4/8/12/20-quarter windows,
       10-year dividend record) → `docs/decisions/0015`; dataset version

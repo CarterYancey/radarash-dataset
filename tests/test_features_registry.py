@@ -23,6 +23,7 @@ SECTION_FAMILIES = {
     "Profitability": "profitability",
     "Growth & trends": "growth",
     "Trend & consistency": "trend",
+    "Relative value": "relvalue",
     "Solvency / distress": "solvency",
     "Earnings quality": "quality",
     "Technical": "technical",
@@ -129,7 +130,9 @@ def test_rank_policy_adr_0016():
         f"{series}_up_frac_{w}q"
         for series in ("revenue", "tangibles", "ocf")
         for w in (4, 8, 12, 20)
-    } | {f"ocf_positive_frac_{w}q" for w in (4, 8, 12, 20)}
+    } | {f"ocf_positive_frac_{w}q" for w in (4, 8, 12, 20)} | {
+        "sales_yield_5y_pctile", "book_to_market_5y_pctile",
+    }
     assert {s.name for s in FEATURES if s.kind == "numeric" and s.rank == "none"} == unranked
 
     pinned = {  # name: (pin_value, pin_rank)
@@ -141,6 +144,7 @@ def test_rank_policy_adr_0016():
         "gp_to_assets": (0.0, 0.5), "asset_turnover_delta_1y": (0.0, 0.5),
         "gross_margin_delta_1y": (0.0, 0.5),
         "gross_margin_delta_2y": (0.0, 0.5), "ret_1m": (0.0, 0.5),
+        "sales_yield_vs_5y_median": (0.0, 0.0),
         # masses at raw 1: no cost of revenue / unchanged margin / no net debt
         "gross_margin": (1.0, 1.0), "gmi": (1.0, 0.5),
         "ev_to_marketcap": (1.0, 0.5),

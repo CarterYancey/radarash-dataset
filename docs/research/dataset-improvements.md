@@ -161,6 +161,11 @@ falls out of the forward-fill for free.
 
 ### 2.1 "Discount relative to its own past" — the strongest addition
 
+*(Graduated: family `relvalue`, dataset v1.3 → `decisions/0018`. Changes
+from the sketch: the price anchor is `least(datekey, reportperiod + 45d)`
+with a 14-day staleness guard, and `*_5y_pctile` ships unranked under
+ADR 0016 — the ranked cross-sectional view is `*_vs_5y_median_rank`.)*
+
 Nothing in the registry expresses "this stock is cheaper than *it* usually
 is": valuation features are all point-in-time levels, and the rank pass
 compares against the *cross-section*, not the stock's own history. For a

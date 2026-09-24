@@ -14,7 +14,7 @@ this manual tells you how to *use* them together. Design rationale: PLAN.md.
 One versioned, immutable directory:
 
 ```
-dataset_v1.2/
+dataset_v1.3/
 ├── dataset.parquet       one row per snapshot: key, features, ranks, labels, weights
 ├── splits.parquet        role tags per (scheme, fold, horizon, snapshot)
 ├── split_folds.parquet   frozen fold manifest (boundaries + role counts)
@@ -56,7 +56,7 @@ Use the manifest to select feature columns — don't pattern-match names:
 ```python
 import json
 
-DATASET = "data/datasets/dataset_v1.2"
+DATASET = "data/datasets/dataset_v1.3"
 cols = json.load(open(f"{DATASET}/manifest.json"))["columns"]
 feature_cols = cols["features"] + cols["ranks"] + cols["sector_ranks"]
 ```
@@ -99,6 +99,13 @@ in which case exclude the listed columns from rank-fed models.
 change semantics. Do not compare rank-fed results across it; bump
 `min_dataset_version` on rank-fed configs. Raw columns and flags are
 unchanged.
+
+**v1.3 adds the relative-value family** (decision 0018, additive — no
+existing column changes): `sales_yield` / `book_to_market` against the
+stock's *own* last 20 quarters (`*_vs_5y_median`, ranked;
+`*_5y_pctile`, raw only). They answer "cheap for *this* stock", which the
+cross-sectional ranks cannot; pair them with the level ranks rather than
+replacing them.
 
 Every feature is point-in-time: it reflects only information publicly
 available on or before `snapshot_date`. Do not "enrich" rows by joining
