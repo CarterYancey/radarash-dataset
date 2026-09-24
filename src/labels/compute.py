@@ -6,6 +6,13 @@ last-close values, each converted to a CAGR against the snapshot's entry
 price with the nominal exponent 1/H (the actual window end may land a
 weekend-shift early; the nominal horizon keeps thresholds comparable).
 
+`max_drawdown` is the one path-dependent label: the largest peak-to-trough
+fall of the forward path over [snapshot_date, horizon end], as a positive
+fraction (`0.35` = a 35% fall; `0` = never below a prior peak). The entry
+price counts as a peak. It folds `paths.path_segments` in quarter order:
+each segment's inner drawdown, and the fall from the highest earlier
+segment to its low.
+
 `delisted_in_window` is a single VARCHAR per horizon: 'false' when the
 security still traded at the horizon end, otherwise the delist reason itself
 (no separate reason column). NULL means the horizon is not yet observable —
@@ -72,6 +79,23 @@ def build_label_views(
             FROM forward_paths
             GROUP BY permaticker, snapshot_date, snapshot_kind, horizon_years
         ),
+        drawdowns AS (
+            SELECT permaticker, snapshot_date, snapshot_kind, horizon_years,
+                   max(greatest(seg_dd,
+                                coalesce(1 - seg_min / prior_max, 0.0)))
+                       AS max_drawdown
+            FROM (
+                SELECT *,
+                       max(seg_max) OVER (
+                           PARTITION BY permaticker, snapshot_date,
+                                        snapshot_kind, horizon_years
+                           ORDER BY seg_block
+                           ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING
+                       ) AS prior_max
+                FROM path_segments
+            )
+            GROUP BY permaticker, snapshot_date, snapshot_kind, horizon_years
+        ),
         bench_stats AS (
             SELECT snapshot_date, horizon_years,
                    avg(spy_closeadj) AS spy_terminal_avg
@@ -95,10 +119,13 @@ def build_label_views(
                        1.0 / st.horizon_years) - 1 AS fwd_max_cagr,
                    pow(b.spy_terminal_avg / e.spy_entry_closeadj,
                        1.0 / st.horizon_years) - 1 AS spy_cagr,
+                   dd.max_drawdown,
                    d.is_delisted, d.last_price_date, d.delist_reason
             FROM stock_stats st
             JOIN snapshots s USING (permaticker, snapshot_date, snapshot_kind)
             JOIN delistings d USING (permaticker)
+            LEFT JOIN drawdowns dd
+                USING (permaticker, snapshot_date, snapshot_kind, horizon_years)
             LEFT JOIN bench_stats b USING (snapshot_date, horizon_years)
             LEFT JOIN benchmark_entries e USING (snapshot_date)
         )
@@ -106,6 +133,7 @@ def build_label_views(
                horizon_end,
                closeadj_avg, closeadj_p2p, closeadj_min, closeadj_max,
                fwd_cagr, fwd_cagr_p2p, fwd_min_cagr, fwd_max_cagr,
+               max_drawdown,
                spy_cagr,
                fwd_cagr - spy_cagr AS fwd_excess_cagr,
                {threshold_cols},
@@ -132,6 +160,7 @@ def build_label_views(
             f"any_value(l.fwd_cagr_p2p) {flt} AS fwd_{tag}_cagr_p2p",
             f"any_value(l.fwd_min_cagr) {flt} AS fwd_{tag}_min_cagr",
             f"any_value(l.fwd_max_cagr) {flt} AS fwd_{tag}_max_cagr",
+            f"any_value(l.max_drawdown) {flt} AS fwd_{tag}_max_drawdown",
             f"any_value(l.spy_cagr) {flt} AS fwd_{tag}_spy_cagr",
             f"any_value(l.fwd_excess_cagr) {flt} AS fwd_{tag}_excess_cagr",
             *(

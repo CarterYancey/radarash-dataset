@@ -98,6 +98,9 @@ to try.
 
 ### 1.4 Why not a drawdown-*threshold* label yet
 
+*(Graduated: `fwd_{H}_max_drawdown` shipped as a continuous column,
+thresholds stay downstream → `decisions/0017`.)*
+
 A `label_{H}_maxdd_le_30`-style binary needs the continuous drawdown first
 (§1.5); once `fwd_{H}_max_drawdown` exists, thresholds are again
 downstream-derivable. So the storable object is the continuous column, not
