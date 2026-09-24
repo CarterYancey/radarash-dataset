@@ -170,6 +170,11 @@ Additional stored columns per (snapshot, horizon):
   difference can be before it's indistinguishable from labeling noise.
 - `fwd_{H}_min_cagr` / `fwd_{H}_max_cagr` — min/max price over the terminal month
   (pessimistic/optimistic band; cheap to compute, defer judgment on usefulness)
+- `fwd_{H}_max_drawdown` / `fwd_{H}_max_drawdown_from_entry` — the path-dependent
+  columns: max peak-to-trough fall over the whole forward path (entry counts as a
+  peak), and the worst close vs. entry ("bought here, sold at the bottom"), both
+  positive fractions. Encode "got there without a catastrophic ride"; drawdown
+  thresholds are derived downstream, not stored (`docs/decisions/0017`)
 - `fwd_{H}_closeadj_{avg,p2p,min,max}` — the raw terminal `closeadj` values behind
   the four CAGRs above, so any CAGR can be re-derived (or the convention changed)
   straight from prices
@@ -202,7 +207,8 @@ built in two stages so they can be added later without rewrites:
 
 1. **Path extraction:** for each (permaticker, snapshot_date, horizon), produce the
    forward daily adjusted-price path, with all delisting handling applied here and
-   only here.
+   only here. (Full paths are represented as calendar-quarter segments of
+   (max, min, inner drawdown), which concatenate exactly — decision 0017.)
 2. **Label functions:** endpoint CAGR, terminal-month average, min/max, and (later)
    triple-barrier are each pure functions over that path object.
 

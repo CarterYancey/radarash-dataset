@@ -1,6 +1,6 @@
 """End-to-end tests for the labels pipeline on a hand-checkable world.
 
-Synthetic weekday calendar 2015-01-01 .. 2021-12-31, four stocks:
+Synthetic weekday calendar 2015-01-01 .. 2021-12-31, six stocks:
 
 - GROW (300001): deterministic 12%/yr exponential growth, alive throughout.
   Checks the CAGR math, the terminal-month-average shave vs. point-to-point,
@@ -15,6 +15,11 @@ Synthetic weekday calendar 2015-01-01 .. 2021-12-31, four stocks:
   delisting convention (final adjusted close carried at 0% to horizon)
   with exactly-known CAGRs from three different entry prices.
 - BANK (300004): SIC 6021, excluded from the universe -> no snapshots.
+- DIP (300005): piecewise-constant path whose peaks and troughs sit in
+  different calendar quarters (100 → 60 → 30 → 120 → 24 → 150), pinning
+  the max-drawdown segment fold with hand-computed values.
+- WAVE (300006): a decaying sinusoid on a 5%/yr trend; its max drawdowns are
+  cross-checked against a brute-force daily scan for every snapshot.
 
 SPY grows at exactly 8%/yr in SFP.
 """
@@ -23,6 +28,8 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 from pathlib import Path
+
+import math
 
 import duckdb
 import pytest
@@ -44,6 +51,31 @@ ZIG_PRICES = {
     date(2015, 1, 8): 50.0,  # high
     date(2015, 1, 9): 30.0,  # final close
 }
+
+
+
+def dip_price(day: date) -> float:
+    if day < date(2016, 1, 1):
+        return 100.0
+    if day <= date(2016, 1, 15):
+        return 60.0
+    if day < date(2016, 4, 1):
+        return 30.0
+    if day < date(2016, 7, 1):
+        return 120.0
+    if day < date(2016, 10, 1):
+        return 24.0
+    return 150.0
+
+
+def wave_price(day: date) -> float:
+    t = (day - BASE).days
+    # Decaying swings: the first fall after entry is usually the deepest, so
+    # it lands inside the entry quarter, a middle quarter, or the exit
+    # quarter depending on the snapshot — all three segment kinds decide.
+    amplitude = 0.4 * math.exp(-t / 600)
+    return 100.0 * 1.05 ** (t / 365.25) * (1 + amplitude * math.sin(2 * math.pi * t / 97))
+
 
 TICKERS_CSV = """\
 table,permaticker,ticker,name,exchange,category,sector,industry,famaindustry,siccode,scalemarketcap,isdelisted,firstpricedate,lastpricedate,lastupdated
@@ -99,6 +131,22 @@ def build_sep_csv() -> str:
     return "\n".join(lines) + "\n"
 
 
+# DIP and WAVE exist only in this module's world: the splits tests reuse
+# TICKERS_CSV/build_sep_csv and hand-count its snapshots.
+PATH_TICKERS_ROWS = """\
+SEP,300005,DIP,Dip Corp,NYSE,Domestic Common Stock,Industrials,Machinery,Machinery,3520,3 - Small,N,2015-01-01,2021-12-31,2026-07-01
+SEP,300006,WAVE,Wave Corp,NYSE,Domestic Common Stock,Industrials,Machinery,Machinery,3530,3 - Small,N,2015-01-01,2021-12-31,2026-07-01
+"""
+
+
+def build_path_sep_rows() -> str:
+    lines = []
+    for day in weekdays(BASE, END):
+        lines.append(f"DIP,{day},{dip_price(day)!r},{dip_price(day)!r},2026-07-01")
+        lines.append(f"WAVE,{day},{wave_price(day)!r},{wave_price(day)!r},2026-07-01")
+    return "\n".join(lines) + "\n"
+
+
 def build_sfp_csv() -> str:
     lines = ["ticker,date,close,closeadj,lastupdated"]
     for day in weekdays(BASE, END):
@@ -112,8 +160,8 @@ def labels_world(tmp_path_factory) -> Path:
     data_dir = tmp_path_factory.mktemp("labels_world")
     raw = data_dir / "raw"
     for name, csv_text in (
-        ("TICKERS", TICKERS_CSV),
-        ("SEP", build_sep_csv()),
+        ("TICKERS", TICKERS_CSV + PATH_TICKERS_ROWS),
+        ("SEP", build_sep_csv() + build_path_sep_rows()),
         ("SFP", build_sfp_csv()),
         ("ACTIONS", ACTIONS_CSV),
     ):
@@ -148,8 +196,15 @@ def test_snapshot_counts(labels_world):
         "snapshots",
         "SELECT permaticker, count(*) FROM {t} GROUP BY 1 ORDER BY 1",
     )
-    # GROW: 28 quarters, DEAD: 6, ZIG: 1 — three snapshots each; BANK: none.
-    assert rows == [(300001, 84), (300002, 18), (300003, 3)]
+    # GROW/DIP/WAVE: 28 quarters, DEAD: 6, ZIG: 1 — three snapshots each;
+    # BANK: none.
+    assert rows == [
+        (300001, 84),
+        (300002, 18),
+        (300003, 3),
+        (300005, 84),
+        (300006, 84),
+    ]
 
 
 def test_zigzag_snapshot_dates(labels_world):
@@ -405,7 +460,102 @@ def test_unobservable_horizons_are_null(labels_world):
 def test_labels_row_per_snapshot(labels_world):
     (snapshots,) = one_row(labels_world, "snapshots", "SELECT count(*) FROM {t}")
     (labels,) = one_row(labels_world, "labels", "SELECT count(*) FROM {t}")
-    assert snapshots == labels == 105
+    assert snapshots == labels == 273
+
+
+def test_max_drawdown_hand_checked(labels_world):
+    def dd(permaticker: int, kind: str, quarter: date, horizon: str):
+        """(peak-to-trough max drawdown, max drawdown from entry)."""
+        return one_row(
+            labels_world,
+            "labels",
+            f"""
+            SELECT fwd_{horizon}_max_drawdown,
+                   fwd_{horizon}_max_drawdown_from_entry
+            FROM {{t}}
+            WHERE permaticker = {permaticker} AND snapshot_kind = '{kind}'
+              AND quarter = DATE '{quarter}'
+            """,
+        )
+
+    q2015 = date(2015, 1, 1)
+    # ZIG, all inside the entry quarter, frozen at 30 after delisting.
+    # Low (entry 10) peaks at 50 then ends at 30: a 40% drawdown, but it
+    # never closes below entry. High (entry 50) falls to 30. Median
+    # (entry 30) drops to 10 first — the fall from entry counts for both.
+    assert dd(300003, "low", q2015, "1y") == pytest.approx((0.4, 0.0))
+    assert dd(300003, "high", q2015, "5y") == pytest.approx((0.4, 0.4))
+    assert dd(300003, "median", q2015, "1y") == pytest.approx((2 / 3, 2 / 3))
+    # Monotonic and constant paths never fall; DEAD stays 0 past delisting.
+    assert dd(300001, "median", q2015, "5y") == pytest.approx((0.0, 0.0))
+    assert dd(300002, "median", q2015, "2y") == pytest.approx((0.0, 0.0))
+
+    # DIP from 2015-01-01 (entry 100). 1y ends 2016-01-01 at 60: 40%, and
+    # the 30s later in that exit quarter are past the horizon end. 2y: the
+    # peak 120 (2016-Q2) and trough 24 (2016-Q3) both sit in quarters
+    # strictly inside the path: 80% peak-to-trough, 76% below entry.
+    assert dd(300005, "median", q2015, "1y") == pytest.approx((0.4, 0.4))
+    assert dd(300005, "median", q2015, "2y") == pytest.approx((0.8, 0.76))
+    assert dd(300005, "median", q2015, "5y") == pytest.approx((0.8, 0.76))
+    # Low of 2016-Q1 (entry 30 on 2016-01-18): up to 120, down to 24.
+    assert dd(300005, "low", date(2016, 1, 1), "1y") == pytest.approx((0.8, 0.2))
+    # Entry at the 120 peak (2016-04-01): fall to 24 in the next quarter.
+    assert dd(300005, "median", date(2016, 4, 1), "1y") == pytest.approx((0.8, 0.8))
+    # Entry at 150 (2016-10-03), flat forever after.
+    assert dd(300005, "median", date(2016, 10, 1), "3y") == pytest.approx((0.0, 0.0))
+
+    # Unobservable horizon: NULL like every other label.
+    assert dd(300005, "high", date(2021, 10, 1), "1y") == (None, None)
+
+
+def naive_max_drawdown(prices: list[float]) -> float:
+    peak, worst = prices[0], 0.0
+    for px in prices:
+        peak = max(peak, px)
+        worst = max(worst, 1 - px / peak)
+    return worst
+
+
+def add_years(day: date, years: int) -> date:
+    try:
+        return day.replace(year=day.year + years)
+    except ValueError:  # Feb 29 -> Feb 28, as DuckDB's to_years does
+        return day.replace(year=day.year + years, day=28)
+
+
+def test_max_drawdown_matches_brute_force(labels_world):
+    days = list(weekdays(BASE, END))
+    series = {
+        300005: [(d, dip_price(d)) for d in days],
+        300006: [(d, wave_price(d)) for d in days],
+    }
+    rows = query(
+        labels_world,
+        "labels",
+        """
+        SELECT permaticker, snapshot_date,
+               [fwd_1y_max_drawdown, fwd_1y_max_drawdown_from_entry],
+               [fwd_2y_max_drawdown, fwd_2y_max_drawdown_from_entry],
+               [fwd_3y_max_drawdown, fwd_3y_max_drawdown_from_entry],
+               [fwd_5y_max_drawdown, fwd_5y_max_drawdown_from_entry]
+        FROM {t} WHERE permaticker IN (300005, 300006)
+        """,
+    )
+    checked = 0
+    for permaticker, snapshot_date, *stored in rows:
+        for years, (max_dd, from_entry) in zip((1, 2, 3, 5), stored):
+            target = add_years(snapshot_date, years)
+            if target > END:
+                assert (max_dd, from_entry) == (None, None)
+                continue
+            path = [
+                px for d, px in series[permaticker] if snapshot_date <= d <= target
+            ]
+            assert max_dd == pytest.approx(naive_max_drawdown(path), abs=1e-12)
+            assert from_entry == pytest.approx(1 - min(path) / path[0], abs=1e-12)
+            checked += 1
+    # WAVE's swings make most paths draw down across quarter boundaries.
+    assert checked > 400
 
 
 def test_missing_inputs(tmp_path):
