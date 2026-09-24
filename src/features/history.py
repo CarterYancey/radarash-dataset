@@ -13,7 +13,7 @@ columns:
   bucket. Carries the trend series (`revenue`, `tangibles`, `ncfo`) plus
   the adjacent-quarter previous values (`prev_*`, valid when
   `prev_qoff = qoff + 1`), and for the relative-value family the bucket
-  filing's own `equity`, `shares` (`sharesbas × sharefactor`),
+  filing's own `netinc`, `fcf`, `equity`, `shares` (`sharesbas × sharefactor`),
   `bucket_datekey` and `bucket_reportperiod` (its historical market cap is
   priced in src/features/relvalue.py).
 - **`div_history`** — one row per snapshot × fiscal-year offset `yoff`
@@ -97,7 +97,8 @@ def build_fund_history_view(
         offset_name="qoff",
         value_cols=(
             "f.f_revenue AS revenue, f.l_tangibles AS tangibles, "
-            "f.f_ncfo AS ncfo, f.l_equity AS equity, "
+            "f.f_ncfo AS ncfo, f.f_netinc AS netinc, f.f_fcf AS fcf, "
+            "f.l_equity AS equity, "
             "f.l_sharesbas * f.l_sharefactor AS shares, "
             "f.datekey AS bucket_datekey, "
             "f.reportperiod AS bucket_reportperiod"

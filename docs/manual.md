@@ -101,9 +101,12 @@ change semantics. Do not compare rank-fed results across it; bump
 unchanged.
 
 **v1.3 adds the relative-value family** (decision 0018, additive — no
-existing column changes): `sales_yield` / `book_to_market` against the
-stock's *own* last 20 quarters (`*_vs_5y_median`, ranked;
-`*_5y_pctile`, raw only). They answer "cheap for *this* stock", which the
+existing column changes): the six marketcap yields (earnings, OCF, FCF,
+sales, book, tangible book) against the stock's *own* last 20 quarters
+(`*_vs_5y_median`, ranked; `*_5y_pctile`, raw only — prefer it for the
+sign-changing earnings/cash-flow yields, whose median ratio is NULL when
+the historical median is ≤ 0). NULL for stocks without ~3 years of
+priced history — keep the NULLs. They answer "cheap for *this* stock", which the
 cross-sectional ranks cannot; pair them with the level ranks rather than
 replacing them.
 

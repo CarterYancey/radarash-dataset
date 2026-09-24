@@ -67,10 +67,16 @@ era-identifiability probe) live on its task list, not here.
       done → ADR 0017; triple-barrier still deferred), Ohlson O-score + magic-formula composite
       + F-score component flags, and trend-family extensions (share count,
       margins). Each graduates via its own ADR.
-- [x] **M4 — Features.** Relative-value family: `sales_yield` /
-      `book_to_market` vs. the stock's own 20-quarter history
+- [x] **M4 — Features.** Relative-value family: the six marketcap
+      yields (earnings/ocf/fcf/sales yield, book and tangible book to
+      market) vs. the stock's own 20-quarter history
       (`*_vs_5y_median`, `*_5y_pctile`), historical market cap priced per
       `fund_history` bucket → `docs/decisions/0018`; dataset version 1.3.
+- [ ] **QA — split basis of `close × sharesbas`.** Does SEP `close` share
+      SF1 `sharesbas`'s split basis at every date? Check marketcap
+      continuity across ACTIONS splits (affects ADR 0007 marketcap and the
+      ADR 0018 historical buckets); if as-of-day, NULL relvalue buckets
+      with a split between share-count date and price anchor.
 - [x] **M4 — Features.** Trend & consistency family (long-horizon financial
       health: revenue/tangibles/OCF trends over 4/8/12/20-quarter windows,
       10-year dividend record) → `docs/decisions/0015`; dataset version

@@ -131,7 +131,9 @@ def test_rank_policy_adr_0016():
         for series in ("revenue", "tangibles", "ocf")
         for w in (4, 8, 12, 20)
     } | {f"ocf_positive_frac_{w}q" for w in (4, 8, 12, 20)} | {
-        "sales_yield_5y_pctile", "book_to_market_5y_pctile",
+        f"{r}_5y_pctile"
+        for r in ("earnings_yield", "ocf_yield", "fcf_yield", "sales_yield",
+                  "book_to_market", "tangible_book_to_market")
     }
     assert {s.name for s in FEATURES if s.kind == "numeric" and s.rank == "none"} == unranked
 

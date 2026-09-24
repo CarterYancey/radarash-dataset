@@ -3,18 +3,22 @@
 Own synthetic world (weekday calendar 2012-01-02 .. 2017-12-29; prices
 constant within every calendar quarter, so each snapshot kind collapses
 onto the quarter's first trading day), three stocks with flat
-fundamentals — TTM revenue 100, equity 50, 10 shares — so every change in
-the ratios comes from the price:
+fundamentals — TTM netinc 20 / ncfo 10 / fcf 5 / revenue 100, equity 50,
+tangibles 40, 10 shares — so every change in the ratios comes from the
+price, and all six ratios move by the same factor:
 
 - CHEAP (600001): quarterly filings 2012Q1 .. 2017Q3 filed 60 days after
   period end (the historical price anchor is `reportperiod + 45d`), close
-  10 through 2016 then 5 from 2017-01-02: sales_yield 1 → 2,
-  book_to_market 0.5 → 1. Pins the vs-median / midrank-percentile
-  arithmetic and the 20q min-count boundary (11 priced buckets).
+  10 through 2016 then 5 from 2017-01-02: every ratio doubles (e.g.
+  sales_yield 1 → 2, book_to_market 0.5 → 1). Pins the vs-median /
+  midrank-percentile arithmetic and the 20q min-count boundary (11 priced
+  buckets).
 - PRE (600002): same filings filed 40 days after period end (anchor =
-  datekey), but prices only from 2014-07-01 and none 2015-06-01 ..
-  2015-09-30 — pre-listing buckets and the bucket whose anchor falls in
-  the gap (last print > 14 days old) stay unpriced.
+  datekey), but a steady loss (netinc −5), prices only from 2014-07-01 and
+  none 2015-06-01 .. 2015-09-30 — pre-listing buckets and the bucket whose
+  anchor falls in the gap (last print > 14 days old) stay unpriced, and
+  the all-negative earnings_yield history has no median ratio (median ≤ 0)
+  but still a percentile.
 - NOFIL (600003): prices but no SF1 filings — the whole family is NULL.
 """
 
@@ -66,11 +70,14 @@ def build_sf1_csv() -> str:
     lines = [header]
     # Every field numeric (an all-empty CSV column would type as VARCHAR).
     levels = dict.fromkeys(ARQ_LEVEL_FIELDS, 1) | {
-        "assets": 200, "equity": 50, "debt": 0, "cashneq": 10,
-        "sharesbas": 10, "sharefactor": 1,
+        "assets": 200, "equity": 50, "tangibles": 40, "debt": 0,
+        "cashneq": 10, "sharesbas": 10, "sharefactor": 1,
     }
-    flows = dict.fromkeys(ART_FLOW_FIELDS, 0) | {"revenue": 100, "ncfo": 10}
     for ticker, lag in FILING_LAG_DAYS.items():
+        flows = dict.fromkeys(ART_FLOW_FIELDS, 0) | {
+            "netinc": -5 if ticker == "PRE" else 20, "ncfo": 10, "fcf": 5,
+            "revenue": 100,
+        }
         for rp in PERIODS:
             datekey = rp + timedelta(days=lag)
             lines += sf1_rows(ticker, str(datekey), str(rp), levels, flows)
@@ -127,10 +134,23 @@ def relvalue_world(tmp_path_factory) -> Path:
     return data_dir
 
 
-COLUMNS = (
-    "sales_yield_vs_5y_median, sales_yield_5y_pctile, "
-    "book_to_market_vs_5y_median, book_to_market_5y_pctile"
+RATIOS = (
+    "earnings_yield", "ocf_yield", "fcf_yield", "sales_yield",
+    "book_to_market", "tangible_book_to_market",
 )
+COLUMNS = ", ".join(
+    f"{r}_{stat}" for r in RATIOS for stat in ("vs_5y_median", "5y_pctile")
+)
+
+
+def expect(vs_median, pctile, **overrides):
+    """Expected (vs_median, pctile) pairs for all six ratios, in COLUMNS
+    order; `overrides` maps a ratio to its own pair."""
+    pairs = [overrides.get(r, (vs_median, pctile)) for r in RATIOS]
+    return tuple(v for pair in pairs for v in pair)
+
+
+ALL_NULL = expect(None, None)
 
 
 def relvalue_row(data_dir: Path, permaticker: int, snapshot_date: str,
@@ -150,11 +170,11 @@ def relvalue_row(data_dir: Path, permaticker: int, snapshot_date: str,
 def test_cheap_vs_all_of_its_history(relvalue_world):
     # 2017-01-02 (close 5): T0 = 2016-09-30. Buckets 2012-03-31 ..
     # 2016-09-30 (19 obs), all anchored at reportperiod + 45d before the
-    # step -> historical close 10: sales_yield 1, book_to_market 0.5.
-    # Current: 100/50 = 2 and 50/50 = 1 -> 2x the median, above every
-    # past value.
+    # step -> historical close 10 (marketcap 100; e.g. sales_yield 1,
+    # book_to_market 0.5). Current marketcap 50 doubles every ratio ->
+    # 2x the median, above every past value.
     row = relvalue_row(relvalue_world, 600001, "2017-01-02")
-    assert row == pytest.approx((2.0, 1.0, 2.0, 1.0))
+    assert row == pytest.approx(expect(2.0, 1.0))
 
 
 def test_cheap_percentile_with_ties(relvalue_world):
@@ -163,29 +183,27 @@ def test_cheap_percentile_with_ties(relvalue_world):
     # step at close 5 (ratio equal to the current one). 17 below + 3 tied:
     # pctile (17 + 1.5) / 20; the median is still the pre-step value.
     row = relvalue_row(relvalue_world, 600001, "2017-10-02")
-    assert row == pytest.approx((2.0, 0.925, 2.0, 0.925))
+    assert row == pytest.approx(expect(2.0, 0.925))
     # The valuation family's snapshot ratios are the "current" values.
     path = relvalue_world / "interim" / "features" / "valuation.parquet"
     cur = duckdb.sql(
         f"""
-        SELECT sales_yield, book_to_market FROM '{path}'
+        SELECT {", ".join(RATIOS)} FROM '{path}'
         WHERE permaticker = 600001 AND snapshot_kind = 'median'
           AND snapshot_date = DATE '2017-10-02'
         """
     ).fetchall()
-    assert cur == [pytest.approx((2.0, 1.0))]
+    assert cur == [pytest.approx((0.4, 0.2, 0.1, 2.0, 1.0, 0.8))]
 
 
 def test_cheap_min_count_boundary(relvalue_world):
     # 2015-01-01: T0 = 2014-09-30 -> 11 buckets back to 2012-03-31, exactly
     # the 20q minimum; flat price, so current = every past value (all ties).
     assert relvalue_row(relvalue_world, 600001, "2015-01-01") == pytest.approx(
-        (1.0, 0.5, 1.0, 0.5)
+        expect(1.0, 0.5)
     )
     # 2014-10-01: T0 = 2014-06-30 -> 10 buckets: below the minimum.
-    assert relvalue_row(relvalue_world, 600001, "2014-10-01") == (
-        None, None, None, None,
-    )
+    assert relvalue_row(relvalue_world, 600001, "2014-10-01") == ALL_NULL
 
 
 def test_pre_listing_and_stale_prices_are_unpriced(relvalue_world):
@@ -193,12 +211,12 @@ def test_pre_listing_and_stale_prices_are_unpriced(relvalue_world):
     # from 2014-08-09 (rp 2014-06-30) on have a print: 11 buckets, but
     # rp 2015-06-30's anchor 2015-08-09 sits in the price gap (last print
     # 2015-05-29, > 14 days old) -> 10 priced: NULL.
-    assert relvalue_row(relvalue_world, 600002, "2017-04-03") == (
-        None, None, None, None,
-    )
-    # One quarter later the window holds 11 priced buckets.
+    assert relvalue_row(relvalue_world, 600002, "2017-04-03") == ALL_NULL
+    # One quarter later the window holds 11 priced buckets. earnings_yield
+    # is -0.05 in every bucket and now: the median is <= 0, so no median
+    # ratio, but the percentile is sign-agnostic (all ties -> 0.5).
     assert relvalue_row(relvalue_world, 600002, "2017-07-03") == pytest.approx(
-        (1.0, 0.5, 1.0, 0.5)
+        expect(1.0, 0.5, earnings_yield=(None, 0.5))
     )
 
 

@@ -205,21 +205,34 @@ Valuation against the stock's **own** past, not the cross-section: is it
 cheaper than *it* usually is? Each quarterly history bucket (the 20q
 `fund_history` window above, qoff 0…19) is priced at its own historical
 market cap — `close × sharesbas × sharefactor` of that bucket's filing
-(ADR 0007 convention, no DAILY), with `close` the unadjusted SEP close on
-the last trading day on or before the anchor `least(datekey,
+(ADR 0007 convention, no DAILY), with `close` the SEP `close` (the field
+the snapshot marketcap uses) on the last trading day on or before the anchor `least(datekey,
 reportperiod + 45d)`, NULL when that print is more than 14 days older than
 the anchor (pre-listing history, halts). The anchor never passes the
 bucket filing's `datekey`, so every input is public at the snapshot. The
-current value is the snapshot-date valuation ratio (Valuation above).
-Both statistics need ≥ 11 priced historical values (ADR 0015's 20q rule)
-and a current value; missing stays NULL.
+current value is the snapshot-date valuation ratio (Valuation above;
+same numerators: ART TTM `netinc`/`ncfo`/`fcf`/`revenue`, ARQ
+`equity`/`tangibles`). For the sign-changing ratios the percentile is the
+robust statistic: it is defined whatever the signs, while the median ratio
+needs a positive historical median. Both statistics need ≥ 11 priced
+historical values (ADR 0015's 20q rule) and a current value; missing stays
+NULL — including for young listings and the first ~3 years of the data
+floor, where the absence of a history is itself the signal.
 
 | column | tier | definition | notes |
 |---|---|---|---|
-| `sales_yield_vs_5y_median` | T5 | `sales_yield / median(historical sales_yield)` | > 1 ⇒ cheaper than its own norm; NULL if the median ≤ 0; pinned rank (0) — revenue gone to zero |
-| `sales_yield_5y_pctile` | T5 | `(#hist < cur + ½·#hist = cur) / n` over the historical `sales_yield` values | 1 ⇒ cheaper than every past bucket; not ranked (share) |
-| `book_to_market_vs_5y_median` | T5 | `book_to_market / median(historical book_to_market)` | NULL if the median ≤ 0; negative current book kept (sign of the numerator) |
+| `earnings_yield_vs_5y_median` | T5 | `earnings_yield / median(historical earnings_yield)` | > 1 ⇒ cheaper than its own norm; NULL if the median ≤ 0; a current loss is kept (below 0) |
+| `earnings_yield_5y_pctile` | T5 | `(#hist < cur + ½·#hist = cur) / n` over the historical `earnings_yield` values | 1 ⇒ cheaper than every past bucket; not ranked (share) |
+| `ocf_yield_vs_5y_median` | T5 | `ocf_yield / median(historical ocf_yield)` | NULL if the median ≤ 0; current cash burn is kept (below 0) |
+| `ocf_yield_5y_pctile` | T5 | same midrank percentile over historical `ocf_yield` | not ranked (share) |
+| `fcf_yield_vs_5y_median` | T5 | `fcf_yield / median(historical fcf_yield)` | NULL if the median ≤ 0; current negative FCF is kept (below 0) |
+| `fcf_yield_5y_pctile` | T5 | same midrank percentile over historical `fcf_yield` | not ranked (share) |
+| `sales_yield_vs_5y_median` | T5 | `sales_yield / median(historical sales_yield)` | NULL if the median ≤ 0; pinned rank (0) — revenue gone to zero |
+| `sales_yield_5y_pctile` | T5 | same midrank percentile over historical `sales_yield` | not ranked (share) |
+| `book_to_market_vs_5y_median` | T5 | `book_to_market / median(historical book_to_market)` | NULL if the median ≤ 0; negative current book kept (below 0) |
 | `book_to_market_5y_pctile` | T5 | same midrank percentile over historical `book_to_market` | not ranked (share) |
+| `tangible_book_to_market_vs_5y_median` | T5 | `tangible_book_to_market / median(historical tangible_book_to_market)` | NULL if the median ≤ 0; negative current tangible book kept (below 0) |
+| `tangible_book_to_market_5y_pctile` | T5 | same midrank percentile over historical `tangible_book_to_market` | not ranked (share) |
 
 ## Solvency / distress
 

@@ -163,7 +163,8 @@ falls out of the forward-fill for free.
 
 *(Graduated: family `relvalue`, dataset v1.3 → `decisions/0018`. Changes
 from the sketch: the price anchor is `least(datekey, reportperiod + 45d)`
-with a 14-day staleness guard, and `*_5y_pctile` ships unranked under
+with a 14-day staleness guard, all six marketcap yields are covered (not
+just sales/book), and `*_5y_pctile` ships unranked under
 ADR 0016 — the ranked cross-sectional view is `*_vs_5y_median_rank`.)*
 
 Nothing in the registry expresses "this stock is cheaper than *it* usually

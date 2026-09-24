@@ -8,9 +8,10 @@ own historical market cap, ADR 0007 convention:
     hist_marketcap = close(anchor) × shares   (that filing's sharesbas × sharefactor)
     anchor         = least(bucket_datekey, bucket_reportperiod + ANCHOR_DAYS)
 
-`close(anchor)` is the unadjusted SEP close on the last trading day on or
-before the anchor, NULL when that print is more than `PRICE_STALENESS_DAYS`
-older than the anchor (pre-listing history, trading halts). The anchor
+`close(anchor)` is SEP `close` (the field `market_inputs` prices the
+snapshot marketcap with) on the last trading day on or before the anchor,
+NULL when that print is more than `PRICE_STALENESS_DAYS` older than the
+anchor (pre-listing history, trading halts). The anchor
 never passes the bucket filing's `datekey`, which is itself before the
 snapshot (`<=` for inference), so every input is public at the snapshot.
 
@@ -18,7 +19,9 @@ Per ratio `r` in `RATIOS` (yield orientation — higher is cheaper) and the
 20-quarter window (`qoff < 20`):
 
 - `{r}_vs_5y_median` — current `r` ÷ median of the historical bucket values
-  (> 1 ⇒ cheaper than its own norm); NULL when the median is ≤ 0.
+  (> 1 ⇒ cheaper than its own norm); NULL when the median is ≤ 0. For a
+  positive median it is monotone in the current value, so a negative
+  current numerator (a loss, cash burn) stays meaningful: below 0.
 - `{r}_5y_pctile` — midrank percentile of the current value within its own
   historical values: `(#below + ½·#equal) / n`, in [0, 1] (1 ⇒ cheaper than
   every past observation).
@@ -42,10 +45,15 @@ ANCHOR_DAYS = 45
 PRICE_STALENESS_DAYS = 14
 
 # feature-name prefix -> (numerator in fund_history, numerator in fund_base);
-# denominators are the historical / snapshot-date marketcap.
+# denominators are the historical / snapshot-date marketcap. Same order and
+# numerators as the valuation family's columns of the same name.
 RATIOS: dict[str, tuple[str, str]] = {
+    "earnings_yield": ("netinc", "f_netinc"),
+    "ocf_yield": ("ncfo", "f_ncfo"),
+    "fcf_yield": ("fcf", "f_fcf"),
     "sales_yield": ("revenue", "f_revenue"),
     "book_to_market": ("equity", "l_equity"),
+    "tangible_book_to_market": ("tangibles", "l_tangibles"),
 }
 
 
@@ -80,6 +88,7 @@ def build_relvalue_view(con: duckdb.DuckDBPyConnection) -> None:
         expr for name in RATIOS for expr in _relvalue_exprs(name)
     )
     cur_names = ", ".join(f"c.{name}" for name in RATIOS)
+    hist_inputs = ", ".join(dict.fromkeys(col for col, _ in RATIOS.values()))
     con.execute(
         f"""
         CREATE OR REPLACE TEMP VIEW features_relvalue AS
@@ -92,7 +101,7 @@ def build_relvalue_view(con: duckdb.DuckDBPyConnection) -> None:
         ),
         anchored AS (
             SELECT permaticker, snapshot_date, snapshot_kind, qoff,
-                   revenue, equity, shares,
+                   {hist_inputs}, shares,
                    least(bucket_datekey,
                          bucket_reportperiod + {ANCHOR_DAYS}) AS anchor
             FROM fund_history
