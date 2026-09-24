@@ -109,7 +109,7 @@ final registry in `docs/features.md`):
 4. **Profitability & growth:** ROE, ROA, ROIC, gross margin, margin trends,
    revenue/EPS growth (YoY from ARQ history).
 5. **Technical (small set):** trailing 6m/12m total return, 12m volatility,
-   distance from 52-week high, market cap (log); from v1.3 the long-window
+   distance from 52-week high, market cap (log); from v1.4 the long-window
    anchors (distance from the 5-year high, price vs. 5-year average,
    36→12-month reversal), the MAX factor and 12-month market beta
    (decision 0019).

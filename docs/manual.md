@@ -14,7 +14,7 @@ this manual tells you how to *use* them together. Design rationale: PLAN.md.
 One versioned, immutable directory:
 
 ```
-dataset_v1.3/
+dataset_v1.4/
 ├── dataset.parquet       one row per snapshot: key, features, ranks, labels, weights
 ├── splits.parquet        role tags per (scheme, fold, horizon, snapshot)
 ├── split_folds.parquet   frozen fold manifest (boundaries + role counts)
@@ -56,7 +56,7 @@ Use the manifest to select feature columns — don't pattern-match names:
 ```python
 import json
 
-DATASET = "data/datasets/dataset_v1.3"
+DATASET = "data/datasets/dataset_v1.4"
 cols = json.load(open(f"{DATASET}/manifest.json"))["columns"]
 feature_cols = cols["features"] + cols["ranks"] + cols["sector_ranks"]
 ```
@@ -100,7 +100,7 @@ change semantics. Do not compare rank-fed results across it; bump
 `min_dataset_version` on rank-fed configs. Raw columns and flags are
 unchanged.
 
-**v1.3 adds the relative-value family** (decision 0018, additive — no
+**v1.4 adds the relative-value family** (decision 0018, additive — no
 existing column changes): the six marketcap yields (earnings, OCF, FCF,
 sales, book, tangible book) against the stock's *own* last 20 quarters
 (`*_vs_5y_median`, ranked; `*_5y_pctile`, raw only — prefer it for the

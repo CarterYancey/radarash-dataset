@@ -59,7 +59,7 @@ against PLAN §5, all cheap because their inputs are already stored:
 
 ## Consequences
 
-- Dataset v1.3; 11 new columns (+ `ohlson_o_rank`,
+- Dataset v1.4; 11 new columns (+ `ohlson_o_rank`,
   `magic_formula_score_rank`). No existing column changes.
 - `piotroski_f` and the flags are redundant by construction (the sum is a
   function of the flags when all are known); trees tolerate this, linear

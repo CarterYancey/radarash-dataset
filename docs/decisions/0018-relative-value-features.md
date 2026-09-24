@@ -92,7 +92,7 @@ quarterly filings known at the snapshot date; it only lacks a price.
 - `FAMILIES` gains `relvalue`; assembly, QA coverage and the inference
   dataset pick it up through the registry. Twelve columns, plus six rank
   columns at assembly.
-- Dataset **v1.3** (`added_in_version: "1.3"`; `sharadar-assemble`
+- Dataset **v1.4** (`added_in_version: "1.4"`; `sharadar-assemble`
   default bumped). Additive: no existing column changes.
 - Burn-in matches the 20q trend features: populated from ~11 quarters of
   listed history, i.e. from ~2001 on the ~1998 data floor, and not for

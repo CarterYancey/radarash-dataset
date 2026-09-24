@@ -15,7 +15,7 @@ predictors, the lottery/MAX factor and market beta. The technical family
 
 ## Decision
 
-1. **Five technical-family columns** (dataset v1.3), all from
+1. **Five technical-family columns** (dataset v1.4), all from
    `SEP.closeadj` on the dense trading-day index like the rest of the
    family:
    - `dist_5y_high` = `closeadj / max(closeadj over t−1260…t) − 1` — the

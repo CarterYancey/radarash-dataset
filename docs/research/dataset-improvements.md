@@ -161,7 +161,7 @@ falls out of the forward-fill for free.
 
 ### 2.1 "Discount relative to its own past" — the strongest addition
 
-*(Graduated: family `relvalue`, dataset v1.3 → `decisions/0018`. Changes
+*(Graduated: family `relvalue`, dataset v1.4 → `decisions/0018`. Changes
 from the sketch: the price anchor is `least(datekey, reportperiod + 45d)`
 with a 14-day staleness guard, all six marketcap yields are covered (not
 just sales/book), and `*_5y_pctile` ships unranked under
@@ -196,7 +196,7 @@ merely low-multiple" signal the models are missing.
 
 ### 2.2 Cheap price-only variants (do these regardless)
 
-*(Graduated: all five shipped in the technical family, dataset v1.3 →
+*(Graduated: all five shipped in the technical family, dataset v1.4 →
 `decisions/0019` — the 5y anchors need ≥ 1000 prints (tier P60), and MAX
 and beta use true one-day returns only; beta is `beta_12m` vs. SPY.)*
 
@@ -231,7 +231,7 @@ plus registry/docs rows. Highest-value additions:
 ### 2.4 Standard formulas/scores — registry gaps vs. PLAN §5
 
 *(Graduated: `ohlson_o`, `magic_formula_score` and the nine `piotroski_*`
-flags, dataset v1.3 → `decisions/0020`.)*
+flags, dataset v1.4 → `decisions/0020`.)*
 
 - **Ohlson O-score** — promised in PLAN §5.2, never implemented (Altman Z,
   Z″, Zmijewski, Beneish, Piotroski, Mohanram all exist). All inputs are
