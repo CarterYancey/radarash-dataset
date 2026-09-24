@@ -10,7 +10,8 @@
 [0015](decisions/0015-trend-consistency-features.md) (trend & consistency, v1.1),
 [0016](decisions/0016-rank-quarter-keys.md) (per-feature rank policy, v1.2),
 [0018](decisions/0018-relative-value-features.md) (relative value, v1.3),
-[0019](decisions/0019-long-window-price-features.md) (long-window price features, v1.3).
+[0019](decisions/0019-long-window-price-features.md) (long-window price features, v1.3),
+[0020](decisions/0020-standard-scores.md) (O-score, magic formula, F-score flags, v1.3).
 `src/features/` implements this registry in the build order below.
 Research trail: [research/features.md](research/features.md).
 
@@ -102,6 +103,7 @@ versions diffable from the registry alone.
 | `net_payout_yield` | T0 | `−(ncfdiv + ncfcommon) / marketcap` | Conservative-formula input; pinned rank (0.5) — signed, no payout or issuance at 0.5 |
 | `ncav_to_marketcap` | T0 ⌂ | `(assetsc_q − liabilities_q) / marketcap` | Graham net-net discount |
 | `ev_to_marketcap` | T0 | `ev / marketcap` | leverage-in-price; negative-EV magnitude; pinned rank (0.5 at raw 1) — no net debt at 0.5 |
+| `magic_formula_score` | T0 ⌂ | `ebit_to_ev_rank + roc_greenblatt_rank` | **assembly-stage** composite (needs ranks; ADR 0020): Greenblatt's rank-sum, higher = better, range [0, 2]; NULL if either rank is; added v1.3 |
 
 ## Profitability
 
@@ -260,9 +262,9 @@ floor, where the absence of a history is itself the signal.
 | `altman_z` | T0 ⌂⌐ | `1.2·wc/ta + 1.4·re/ta + 3.3·ebit/ta + 0.6·mve/tl + 1.0·s/ta` | composite; literature comparability |
 | `altman_z_dd` | T0 ⌂⌐ | `6.56·wc/ta + 3.26·re/ta + 6.72·ebit/ta + 1.05·bve/tl` | Z'' — featured variant (mixed universe) |
 | `zmijewski` | T0 ⌂ | `−4.336 − 4.513·roa + 5.679·tl/ta + 0.004·ca/cl` | composite |
+| `ohlson_o` | T1 ⌂ | `−1.32 − 0.407·ln(assets_q/10⁶) + 6.03·tl/ta − 1.43·wc/ta + 0.0757·cl/ca − 1.72·liab_gt_assets − 2.37·roa − 1.83·ffo/tl + 0.285·two_year_loss − 0.521·ni_change_scaled` | composite (ADR 0020); higher = more distress; size term nominal, not GNP-deflated (documented deviation); added v1.3 |
 
-Composites are NULL when any component is NULL (⌂⌐ inherited); the Ohlson
-composite is deferred (ADR 0003) — its components are all above.
+Composites are NULL when any component is NULL (⌂⌐ inherited).
 
 ## Earnings quality (Beneish inputs are ART pairs, T1)
 
@@ -278,6 +280,15 @@ composite is deferred (ADR 0003) — its components are all above.
 | `accruals_to_assets` | T0 | `(netinc − ncfo) / assets_q` | S; TATA & Sloan accruals (CF method), one column |
 | `beneish_m` | T1 ⌂ | `−4.84 + 0.92·dsri + 0.528·gmi + 0.404·aqi + 0.892·sgi + 0.115·depi − 0.172·sgai + 4.679·tata − 0.327·lvgi` | composite |
 | `piotroski_f` | T1 | count of the 9 signals (research §F2.2 table) | composite, 0–9; signals from components above + `ncfcommon ≤ 0`; not ranked (integer score, ADR 0016) |
+| `piotroski_roa_positive` | T0 | `roa > 0` | flag; F-score signal 1; added v1.3 |
+| `piotroski_cfo_positive` | T0 | `ncfo > 0` | flag; F-score signal 2; added v1.3 |
+| `piotroski_roa_up` | T1 | `roa > roa[-1]` | flag; F-score signal 3; added v1.3 |
+| `piotroski_cfo_gt_ni` | T0 | `ncfo > netinc (accruals)` | flag; F-score signal 4; added v1.3 |
+| `piotroski_leverage_down` | T1 | `debtnc_q/assets_q < debtnc_q[-1]/assets_q[-1]` | flag; F-score signal 5; added v1.3 |
+| `piotroski_liquidity_up` | T1 ⌂ | `current_ratio > current_ratio[-1]` | flag; F-score signal 6; added v1.3 |
+| `piotroski_no_issuance` | T0 | `ncfcommon <= 0` | flag; F-score signal 7; added v1.3 |
+| `piotroski_margin_up` | T1 | `gross_margin > gross_margin[-1]` | flag; F-score signal 8; added v1.3 |
+| `piotroski_turnover_up` | T1 | `asset_turnover > asset_turnover[-1]` | flag; F-score signal 9; added v1.3 |
 | `noa_to_assets` | T1 | `((assets_q − cashneq_q − investments_q) − (liabilities_q − debt_q)) / assets_q₋₁` | Hirshleifer NOA |
 | `ext_financing_to_assets` | T0 | `(ncfcommon + ncfdebt) / assets_q` | Bradshaw–Richardson–Sloan; pinned rank (0.5) — signed, no external financing at 0.5 |
 | `rnd_to_assets` | T0 | `coalesce(rnd, 0) / assets_q` | G-score input; unreported R&D counts as 0 — the one explicit fill (ADR 0013); pinned rank (0) |
@@ -331,8 +342,9 @@ diff once two ingest vintages exist.
 ADR 0015) and `market` (marketcap/EV) → `valuation` →
 `profitability` + `growth` → `trend` → `relvalue` → `solvency` → `quality` →
 `technical` → `classification`; then assembly (M5, `src/assemble/`) computes
-ranks/sector-ranks under each feature's rank policy (ADR 0016), the two
-assembly-stage columns (`mohanram_g7`, `conservative_score`, ADR 0013) and
+ranks/sector-ranks under each feature's rank policy (ADR 0016), the
+assembly-stage columns (`mohanram_g7`, `conservative_score`, ADR 0013;
+`magic_formula_score`, ADR 0020) and
 the rank-column quarter-key audit — output layout in dataset.md.
 Market-regime features remain deferred behind their ablation gate
 (PLAN §5.6). Each family writes `data/interim/features/{family}.parquet` on

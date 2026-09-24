@@ -230,6 +230,9 @@ plus registry/docs rows. Highest-value additions:
 
 ### 2.4 Standard formulas/scores — registry gaps vs. PLAN §5
 
+*(Graduated: `ohlson_o`, `magic_formula_score` and the nine `piotroski_*`
+flags, dataset v1.3 → `decisions/0020`.)*
+
 - **Ohlson O-score** — promised in PLAN §5.2, never implemented (Altman Z,
   Z″, Zmijewski, Beneish, Piotroski, Mohanram all exist). All inputs are
   already in `fund_base` (`l_assets`, `l_liabilities`, `l_workingcapital`,

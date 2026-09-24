@@ -109,7 +109,10 @@ the historical median is ≤ 0). NULL for stocks without ~3 years of
 priced history — keep the NULLs. The technical family gains the matching
 price-only anchors (decision 0019): `dist_5y_high`, `price_vs_5y_avg`
 (NULL under ~4 years of prints), `mom_36_12`, plus `max_ret_21d` and
-`beta_12m`. They answer "cheap for *this* stock", which the
+`beta_12m`. Standard scores (decision 0020): `ohlson_o` (distress,
+higher = worse), the assembly-stage `magic_formula_score`, and the nine
+Piotroski signals as `piotroski_*` flags beside `piotroski_f` — a NULL
+flag means "unknown" (e.g. no prior-year filing), not "failed". They answer "cheap for *this* stock", which the
 cross-sectional ranks cannot; pair them with the level ranks rather than
 replacing them.
 

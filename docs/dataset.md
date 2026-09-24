@@ -84,7 +84,7 @@ The gate is `max_key_share`, not `tie_mass`: fine-grained integer columns
 tie nearly every row without emitting a resolvable constant, while a
 pinned mass is tied in every quarter but never keyed.
 
-### Assembly-stage composites (ADR 0013)
+### Assembly-stage composites (ADR 0013, 0020)
 
 - `mohanram_g7` — sum of seven binary signals against `famaindustry`
   medians within (quarter, kind); medians need `--min-industry-peers`
@@ -95,6 +95,10 @@ pinned mass is tied in every quarter but never keyed.
   [0, 3]; NULL if any input rank is NULL. Sits in the technical family's
   column block and is ranked (`full`); `mohanram_g7` is an integer score and
   is not ranked (ADR 0016).
+- `magic_formula_score` (v1.3, ADR 0020) — `ebit_to_ev_rank +
+  roc_greenblatt_rank`, range [0, 2]; NULL if either rank is NULL. Sits in
+  the valuation family's column block and is ranked (`full`), in the same
+  second rank pass as `conservative_score`.
 
 ### Uniqueness weights (ADR 0012)
 

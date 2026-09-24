@@ -3,8 +3,9 @@
 The final stage of the pipeline. Joins the per-family feature parquets to
 `labels.parquet` on the shared snapshot key (validating each family's
 columns against the registry), computes the registry-driven rank and
-sector-rank columns (decision 0008), the two assembly-stage composites
-`mohanram_g7` and `conservative_score` (decision 0013), and the per-horizon
+sector-rank columns (decision 0008), the assembly-stage composites
+`mohanram_g7` and `conservative_score` (decision 0013) and
+`magic_formula_score` (decision 0020), and the per-horizon
 uniqueness weights `sample_weight_{H}y` (decision 0012), then writes a
 versioned, immutable dataset directory
 `data/datasets/dataset_vX.Y/` containing `dataset.parquet`, the split tags

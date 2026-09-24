@@ -65,7 +65,7 @@ era-identifiability probe) live on its task list, not here.
       the V1/V6/V4 verifications, a valuation-vs-own-history feature
       family (done → ADR 0018), path-dependent labels (max drawdown + interim low
       done → ADR 0017; triple-barrier still deferred), Ohlson O-score + magic-formula composite
-      + F-score component flags, and trend-family extensions (share count,
+      + F-score component flags (done → ADR 0020), and trend-family extensions (share count,
       margins). Each graduates via its own ADR.
 - [x] **M4 — Features.** Relative-value family: the six marketcap
       yields (earnings/ocf/fcf/sales yield, book and tangible book to
@@ -77,6 +77,9 @@ era-identifiability probe) live on its task list, not here.
       continuity across ACTIONS splits (affects ADR 0007 marketcap and the
       ADR 0018 historical buckets); if as-of-day, NULL relvalue buckets
       with a split between share-count date and price anchor.
+- [x] **M4 — Features.** Standard scores: `ohlson_o` (solvency),
+      assembly-stage `magic_formula_score`, nine `piotroski_*` signal
+      flags (quality) → `docs/decisions/0020`; dataset version 1.3.
 - [x] **M4 — Features.** Long-window price features in the technical
       family: `dist_5y_high`, `price_vs_5y_avg`, `mom_36_12`,
       `max_ret_21d`, `beta_12m` (SFP now a features/inference input)
