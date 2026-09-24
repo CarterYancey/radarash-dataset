@@ -98,7 +98,8 @@ to try.
 
 ### 1.4 Why not a drawdown-*threshold* label yet
 
-*(Graduated: `fwd_{H}_max_drawdown` shipped as a continuous column,
+*(Graduated: `fwd_{H}_max_drawdown` and the §1.5 item-1 interim low, as
+`fwd_{H}_max_drawdown_from_entry`, shipped as continuous columns;
 thresholds stay downstream → `decisions/0017`.)*
 
 A `label_{H}_maxdd_le_30`-style binary needs the continuous drawdown first

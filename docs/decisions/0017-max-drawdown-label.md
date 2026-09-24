@@ -1,4 +1,4 @@
-# 0017 — Path-dependent label: forward max drawdown per horizon
+# 0017 — Path-dependent labels: forward max drawdowns per horizon
 
 Date: 2026-09-24
 Status: accepted
@@ -24,7 +24,7 @@ the continuous value so thresholds can be re-derived without recomputation
 
 ## Decision
 
-1. **One new continuous column per horizon, `fwd_{H}_max_drawdown`**: the
+1. **A continuous column per horizon, `fwd_{H}_max_drawdown`**: the
    largest peak-to-trough fall of the forward adjusted-close path over
    `[snapshot_date, horizon end]` (the same horizon end as the endpoint
    labels), as a **positive fraction**: `max over s ≤ t of 1 − P_t / P_s`.
@@ -32,17 +32,29 @@ the continuous value so thresholds can be re-derived without recomputation
    35% fall. The **entry price counts as a peak**, so a fall straight from
    entry is a drawdown. This is the "could I have held it" measure, not a
    measure of drawdown from before the snapshot.
-2. **Delisting (decision 0002) needs no new rule**: past the final print
+2. **A second column per horizon, `fwd_{H}_max_drawdown_from_entry`**:
+   the worst mark-to-market loss against the *entry price*,
+   `1 − min(P over the path) / entry_closeadj`, i.e. "bought on the
+   snapshot date, sold at the lowest close before the horizon end". This
+   is the interim low of `research/dataset-improvements.md` §1.5 item 1,
+   stored in drawdown form (a positive fraction, not a CAGR) so that it
+   sits next to its sibling. The entry day is on the path, so the value is
+   in [0, 1) and never exceeds `fwd_{H}_max_drawdown`. They differ when the
+   path first rises: a stock that doubles and then halves back to entry
+   has a 50% max drawdown but 0% from entry. The path's lowest close is
+   recoverable as `entry_closeadj × (1 − value)`, so no raw price column is
+   stored for it.
+3. **Delisting (decision 0002) needs no new rule**: past the final print
    the forward-filled path is flat, so it adds no peak or trough. A stock
    that delists in window has its drawdown measured over its real prints.
-3. **Observability** is the same as for every other label. The column is
-   NULL exactly when the horizon is unobservable.
-4. **No drawdown binaries are stored.** Thresholds such as
+4. **Observability** is the same as for every other label. Both columns
+   are NULL exactly when the horizon is unobservable.
+5. **No drawdown binaries are stored.** Thresholds such as
    `fwd_3y_max_drawdown < 0.20` are derived downstream (`value-ml-models`),
    in the same way as custom CAGR rungs. A threshold is promoted to a
    stored `label_*` column only if it becomes a standard target, via an
    amendment here.
-5. **Computation (stage 1 / stage 2 split kept)**: a snapshot × day join
+6. **Computation (stage 1 / stage 2 split kept)**: a snapshot × day join
    would be about 2B rows at real scale, so it is not used. Stage 1
    (`labels.paths`) compresses each full forward path into
    **calendar-quarter segments** of (max, min, inner drawdown). The segments
@@ -51,21 +63,21 @@ the continuous value so thresholds can be re-derived without recomputation
    these are plain window/GROUP BY aggregates over the stock's own prints.
    The triple is closed under concatenation
    (`dd(A·B) = max(A.dd, B.dd, 1 − B.min / A.max)`), so stage 2
-   (`labels.compute`) folds the segments in order. The cost is about
+   (`labels.compute`) folds the segments in order. The loss from entry is
+   just `min(seg_min)` over the same segments. The cost is about
    (4H + 1) segment rows per (snapshot, horizon). A synthetic benchmark
    at about ⅓ of real scale ran in about 20 s on 4 cores.
 
 ## Consequences
 
-- The label matrix grows by 4 columns. It appears in the next labels build
+- The label matrix grows by 8 columns (two per horizon). It appears in the next labels build
   and dataset version. Assembly picks it up through the `fwd_` prefix
   (the label-matrix column group), and no split or weight logic changes:
   the drawdown window lies inside `[snapshot_date, snapshot_date + H]`,
   so the purge bound remains exact.
 - `path_segments` is the reusable full-path representation. Other
-  path-dependent labels can fold the same segments: the interim-low CAGR
-  (`research/dataset-improvements.md` §1.5 item 1: `seg_min` over the
-  path, versus entry) and, later, triple-barrier labels (first-touch needs
+  path-dependent labels can fold the same segments, for example
+  triple-barrier labels later (first-touch needs
   ordered segments plus a within-segment scan only where a barrier is
   crossed).
 - Drawdown is not scaled by volatility or horizon. Longer horizons can only
@@ -74,5 +86,6 @@ the continuous value so thresholds can be re-derived without recomputation
   per horizon, and probably reported next to `vol_12m`/`vol_36m`.
 - Tests: `tests/test_labels_cli.py` pins hand-computed values (peak and
   trough in the entry quarter, in middle quarters, and after the horizon
-  end in the exit quarter) and checks every (snapshot, horizon) of a
+  end in the exit quarter, including paths where the two columns differ)
+  and checks both columns for every (snapshot, horizon) of a
   decaying-sinusoid stock against a brute-force daily scan.

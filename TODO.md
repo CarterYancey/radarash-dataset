@@ -55,16 +55,16 @@ era-identifiability probe) live on its task list, not here.
 - [x] **M3 — Labels.** Tail-threshold labels (`cagr_ge_{15,20}`) and
       excess-vs-SPY threshold labels (`excess_ge_{5,10}`) — docs/labels.md;
       appear in the next labels build/dataset version.
-- [x] **M3 — Labels.** Path-dependent `fwd_{H}_max_drawdown` per horizon
-      (full forward path as quarter segments; thresholds derived
-      downstream, not stored) → `docs/decisions/0017`; appears in the next
-      labels build/dataset version. *Follow-up candidate on the same
-      segments: interim-low CAGR (research §1.5 item 1).*
+- [x] **M3 — Labels.** Path-dependent `fwd_{H}_max_drawdown` and
+      `fwd_{H}_max_drawdown_from_entry` per horizon (full forward path as
+      quarter segments; thresholds derived downstream, not stored)
+      → `docs/decisions/0017`; appear in the next labels build/dataset
+      version.
 - [ ] **Training-outcomes improvement backlog** — prioritized review in
       `docs/research/dataset-improvements.md` (2026-08-27): top items are
       the V1/V6/V4 verifications, a valuation-vs-own-history feature
-      family, path-dependent labels (interim-low CAGR; max drawdown done →
-      ADR 0017), Ohlson O-score + magic-formula composite
+      family, path-dependent labels (max drawdown + interim low
+      done → ADR 0017; triple-barrier still deferred), Ohlson O-score + magic-formula composite
       + F-score component flags, and trend-family extensions (share count,
       margins). Each graduates via its own ADR.
 - [x] **M4 — Features.** Trend & consistency family (long-horizon financial

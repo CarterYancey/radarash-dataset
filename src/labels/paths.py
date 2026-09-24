@@ -8,8 +8,9 @@ All delisting handling lives here and only here; the label functions in
 - `path_segments` — the *full* forward path from entry to horizon end,
   compressed to calendar-quarter segments carrying (max, min, max
   drawdown). That triple is closed under concatenation, so path-dependent
-  labels (max drawdown today, triple-barrier later) fold the segments in
-  order instead of scanning a snapshot × day join (~2B rows at real scale).
+  labels (max drawdown and loss from entry today, triple-barrier later)
+  fold the segments in order instead of scanning a snapshot × day join
+  (~2B rows at real scale).
 
 Delisting convention (docs/decisions/0002): the forward price on any trading
 day is the security's most recent adjusted close on or before that day

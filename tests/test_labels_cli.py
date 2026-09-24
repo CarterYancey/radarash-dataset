@@ -465,42 +465,47 @@ def test_labels_row_per_snapshot(labels_world):
 
 def test_max_drawdown_hand_checked(labels_world):
     def dd(permaticker: int, kind: str, quarter: date, horizon: str):
-        (value,) = one_row(
+        """(peak-to-trough max drawdown, max drawdown from entry)."""
+        return one_row(
             labels_world,
             "labels",
             f"""
-            SELECT fwd_{horizon}_max_drawdown FROM {{t}}
+            SELECT fwd_{horizon}_max_drawdown,
+                   fwd_{horizon}_max_drawdown_from_entry
+            FROM {{t}}
             WHERE permaticker = {permaticker} AND snapshot_kind = '{kind}'
               AND quarter = DATE '{quarter}'
             """,
         )
-        return value
 
     q2015 = date(2015, 1, 1)
-    # ZIG, all inside the entry quarter, frozen at 30 after delisting:
-    # low (entry 10) peaks at 50 then ends at 30; high (entry 50) falls to
-    # 30; median (entry 30) drops to 10 first — the fall from entry counts.
-    assert dd(300003, "low", q2015, "1y") == pytest.approx(0.4)
-    assert dd(300003, "high", q2015, "5y") == pytest.approx(0.4)
-    assert dd(300003, "median", q2015, "1y") == pytest.approx(2 / 3)
+    # ZIG, all inside the entry quarter, frozen at 30 after delisting.
+    # Low (entry 10) peaks at 50 then ends at 30: a 40% drawdown, but it
+    # never closes below entry. High (entry 50) falls to 30. Median
+    # (entry 30) drops to 10 first — the fall from entry counts for both.
+    assert dd(300003, "low", q2015, "1y") == pytest.approx((0.4, 0.0))
+    assert dd(300003, "high", q2015, "5y") == pytest.approx((0.4, 0.4))
+    assert dd(300003, "median", q2015, "1y") == pytest.approx((2 / 3, 2 / 3))
     # Monotonic and constant paths never fall; DEAD stays 0 past delisting.
-    assert dd(300001, "median", q2015, "5y") == pytest.approx(0.0)
-    assert dd(300002, "median", q2015, "2y") == pytest.approx(0.0)
+    assert dd(300001, "median", q2015, "5y") == pytest.approx((0.0, 0.0))
+    assert dd(300002, "median", q2015, "2y") == pytest.approx((0.0, 0.0))
 
     # DIP from 2015-01-01 (entry 100). 1y ends 2016-01-01 at 60: 40%, and
     # the 30s later in that exit quarter are past the horizon end. 2y: the
     # peak 120 (2016-Q2) and trough 24 (2016-Q3) both sit in quarters
-    # strictly inside the path: 80%.
-    assert dd(300005, "median", q2015, "1y") == pytest.approx(0.4)
-    assert dd(300005, "median", q2015, "2y") == pytest.approx(0.8)
-    assert dd(300005, "median", q2015, "5y") == pytest.approx(0.8)
+    # strictly inside the path: 80% peak-to-trough, 76% below entry.
+    assert dd(300005, "median", q2015, "1y") == pytest.approx((0.4, 0.4))
+    assert dd(300005, "median", q2015, "2y") == pytest.approx((0.8, 0.76))
+    assert dd(300005, "median", q2015, "5y") == pytest.approx((0.8, 0.76))
+    # Low of 2016-Q1 (entry 30 on 2016-01-18): up to 120, down to 24.
+    assert dd(300005, "low", date(2016, 1, 1), "1y") == pytest.approx((0.8, 0.2))
     # Entry at the 120 peak (2016-04-01): fall to 24 in the next quarter.
-    assert dd(300005, "median", date(2016, 4, 1), "1y") == pytest.approx(0.8)
+    assert dd(300005, "median", date(2016, 4, 1), "1y") == pytest.approx((0.8, 0.8))
     # Entry at 150 (2016-10-03), flat forever after.
-    assert dd(300005, "median", date(2016, 10, 1), "3y") == pytest.approx(0.0)
+    assert dd(300005, "median", date(2016, 10, 1), "3y") == pytest.approx((0.0, 0.0))
 
     # Unobservable horizon: NULL like every other label.
-    assert dd(300005, "high", date(2021, 10, 1), "1y") is None
+    assert dd(300005, "high", date(2021, 10, 1), "1y") == (None, None)
 
 
 def naive_max_drawdown(prices: list[float]) -> float:
@@ -528,22 +533,26 @@ def test_max_drawdown_matches_brute_force(labels_world):
         labels_world,
         "labels",
         """
-        SELECT permaticker, snapshot_date, fwd_1y_max_drawdown,
-               fwd_2y_max_drawdown, fwd_3y_max_drawdown, fwd_5y_max_drawdown
+        SELECT permaticker, snapshot_date,
+               [fwd_1y_max_drawdown, fwd_1y_max_drawdown_from_entry],
+               [fwd_2y_max_drawdown, fwd_2y_max_drawdown_from_entry],
+               [fwd_3y_max_drawdown, fwd_3y_max_drawdown_from_entry],
+               [fwd_5y_max_drawdown, fwd_5y_max_drawdown_from_entry]
         FROM {t} WHERE permaticker IN (300005, 300006)
         """,
     )
     checked = 0
     for permaticker, snapshot_date, *stored in rows:
-        for years, value in zip((1, 2, 3, 5), stored):
+        for years, (max_dd, from_entry) in zip((1, 2, 3, 5), stored):
             target = add_years(snapshot_date, years)
             if target > END:
-                assert value is None
+                assert (max_dd, from_entry) == (None, None)
                 continue
             path = [
                 px for d, px in series[permaticker] if snapshot_date <= d <= target
             ]
-            assert value == pytest.approx(naive_max_drawdown(path), abs=1e-12)
+            assert max_dd == pytest.approx(naive_max_drawdown(path), abs=1e-12)
+            assert from_entry == pytest.approx(1 - min(path) / path[0], abs=1e-12)
             checked += 1
     # WAVE's swings make most paths draw down across quarter boundaries.
     assert checked > 400

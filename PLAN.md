@@ -170,10 +170,11 @@ Additional stored columns per (snapshot, horizon):
   difference can be before it's indistinguishable from labeling noise.
 - `fwd_{H}_min_cagr` / `fwd_{H}_max_cagr` — min/max price over the terminal month
   (pessimistic/optimistic band; cheap to compute, defer judgment on usefulness)
-- `fwd_{H}_max_drawdown` — the one path-dependent column: max peak-to-trough fall
-  over the whole forward path (entry counts as a peak), positive fraction. Encodes
-  "got there without a catastrophic ride"; drawdown thresholds are derived
-  downstream, not stored (`docs/decisions/0017`)
+- `fwd_{H}_max_drawdown` / `fwd_{H}_max_drawdown_from_entry` — the path-dependent
+  columns: max peak-to-trough fall over the whole forward path (entry counts as a
+  peak), and the worst close vs. entry ("bought here, sold at the bottom"), both
+  positive fractions. Encode "got there without a catastrophic ride"; drawdown
+  thresholds are derived downstream, not stored (`docs/decisions/0017`)
 - `fwd_{H}_closeadj_{avg,p2p,min,max}` — the raw terminal `closeadj` values behind
   the four CAGRs above, so any CAGR can be re-derived (or the convention changed)
   straight from prices

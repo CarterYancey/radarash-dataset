@@ -9,7 +9,7 @@ tables and the identity artifacts. Two outputs under `data/interim/`:
 Design decisions: snapshot dates in
 [decisions/0001](decisions/0001-quarterly-snapshot-dates.md), delisting
 convention in [decisions/0002](decisions/0002-delisting-return-convention.md),
-max drawdown in [decisions/0017](decisions/0017-max-drawdown-label.md).
+max drawdowns in [decisions/0017](decisions/0017-max-drawdown-label.md).
 
 ## Snapshots
 
@@ -44,6 +44,12 @@ tickers resolved to permatickers by the mapping's price-coverage window.
   `[snapshot_date, horizon end]`, `max over s ≤ t of 1 − P_t / P_s`, as a
   positive fraction (0 = never below an earlier close); the entry price
   counts as a peak. Flat past a delisting, so it adds nothing there.
+- **Max drawdown from entry**: the worst mark-to-market loss vs. the entry
+  price over the same path, `1 − min(P) / entry_closeadj` — bought on the
+  snapshot date, sold at the lowest close before the horizon end. The entry
+  day is on the path, so it is ≥ 0 (0 = never closed below entry) and never
+  exceeds the max drawdown; the two differ when the path rises before it
+  falls.
 - **Benchmark**: SPY from SFP, identical entry/terminal conventions.
 - **Observability**: labels exist only when the nominal end date is on or
   before the last calendar date; otherwise every column for that horizon is
@@ -64,6 +70,7 @@ Keys and entry metadata as in `snapshots.parquet`, then per horizon `{H}`:
 | `fwd_{H}_min_cagr` | double | CAGR to the terminal-window minimum |
 | `fwd_{H}_max_cagr` | double | CAGR to the terminal-window maximum |
 | `fwd_{H}_max_drawdown` | double | max peak-to-trough fall over the whole forward path, positive fraction in [0, 1) (decision 0017) |
+| `fwd_{H}_max_drawdown_from_entry` | double | worst close over the whole forward path vs. entry, `1 − min / entry_closeadj`, in [0, 1) (decision 0017) |
 | `fwd_{H}_spy_cagr` | double | SPY CAGR over the same window, same convention |
 | `fwd_{H}_excess_cagr` | double | `fwd_{H}_cagr` − `fwd_{H}_spy_cagr` |
 | `label_{H}_cagr_ge_0` | bool | `fwd_{H}_cagr ≥ 0%` |
@@ -83,7 +90,9 @@ thresholds can be re-derived without recomputation, and the raw terminal
 straight from prices: each `fwd_{H}_*_cagr` equals
 `(fwd_{H}_closeadj_* / entry_closeadj)^(1/H) − 1`. Drawdown thresholds
 (e.g. "3y max drawdown < 20%") are likewise derived downstream from
-`fwd_{H}_max_drawdown`; no drawdown binaries are stored (decision 0017).
+`fwd_{H}_max_drawdown{,_from_entry}`; no drawdown binaries are stored
+(decision 0017). The path's lowest close is
+`entry_closeadj × (1 − fwd_{H}_max_drawdown_from_entry)`.
 
 ## Module layout (two-stage, PLAN.md §6)
 

@@ -116,9 +116,11 @@ Targets to choose from, per horizon (full definitions: [labels.md](labels.md)):
 - **Continuous**: `fwd_{H}_cagr` (terminal-month-average convention),
   `fwd_{H}_cagr_p2p`, `fwd_{H}_excess_cagr`, min/max variants. Custom
   thresholds can be re-derived from these without touching prices.
-- **Path**: `fwd_{H}_max_drawdown`, the worst peak-to-trough fall between
-  entry and horizon end (positive fraction; entry counts as a peak;
-  datasets built after v1.2). It is stored continuous only: derive
+- **Path** (datasets built after v1.2): `fwd_{H}_max_drawdown`, the worst
+  peak-to-trough fall between entry and horizon end (entry counts as a
+  peak), and `fwd_{H}_max_drawdown_from_entry`, the worst close vs. the
+  entry price ("bought here, sold at the bottom"). Both are positive
+  fractions and stored continuous only: derive
   drawdown targets or filters on the fly, e.g.
   `fwd_3y_max_drawdown < 0.20`, or combine them with a return rung
   (`label_3y_cagr_ge_10 AND fwd_3y_max_drawdown < 0.30`: compounded
