@@ -23,6 +23,7 @@ FAMILIES: tuple[str, ...] = (
     "profitability",
     "growth",
     "trend",
+    "relvalue",
     "solvency",
     "quality",
     "technical",
@@ -54,7 +55,7 @@ class FeatureSpec:
 
     name: str
     family: str
-    tier: str | None  # T0-T3 / P12 / P36 (ADR 0004), T5 / T10 (ADR 0015); None for classification
+    tier: str | None  # T0-T3 / P12 / P36 (ADR 0004), T5 / T10 (ADR 0015), P60 (ADR 0019); None for classification
     kind: str
     definition: str
     rank: str = "full"  # one of RANK_POLICIES; forced to "none" for non-numeric kinds
@@ -114,6 +115,7 @@ FEATURES: tuple[FeatureSpec, ...] = (
     _f("net_payout_yield", "valuation", "T0", "numeric", "-(ncfdiv + ncfcommon) / marketcap", rank="pinned", pin_rank=0.5),
     _f("ncav_to_marketcap", "valuation", "T0", "numeric", "(assetsc_q - liabilities_q) / marketcap"),
     _f("ev_to_marketcap", "valuation", "T0", "numeric", "ev / marketcap", rank="pinned", pin_value=1.0, pin_rank=0.5),
+    _f("magic_formula_score", "valuation", "T0", "numeric", "rank-sum of ebit_to_ev (high), roc_greenblatt (high)", assembly_stage=True, added_in_version="1.3"),
     # ---- profitability ----------------------------------------------------
     _f("gp_to_assets", "profitability", "T0", "numeric", "gp / assets_q", rank="pinned", pin_rank=0.5, sector_rank=True),
     _f("roa", "profitability", "T0", "numeric", "netinc / assets_q"),
@@ -182,6 +184,19 @@ FEATURES: tuple[FeatureSpec, ...] = (
     _f("div_streak_10y", "trend", "T10", "numeric", "consecutive paying years ending now, max 10", rank="none", added_in_version="1.1"),
     _f("div_cuts_10y", "trend", "T10", "numeric", "YoY TTM dividend drops below 0.8x prior, last 10y", rank="none", added_in_version="1.1"),
     _f("div_history_years_10y", "trend", "T10", "numeric", "annual dividend observations known, last 10", rank="none", added_in_version="1.1"),
+    # ---- relative value (ADR 0018; vs. the stock's own 20q history) -------
+    _f("earnings_yield_vs_5y_median", "relvalue", "T5", "numeric", "earnings_yield / median of its 20q historical values", added_in_version="1.3"),
+    _f("earnings_yield_5y_pctile", "relvalue", "T5", "numeric", "midrank percentile of earnings_yield within its 20q history", rank="none", added_in_version="1.3"),
+    _f("ocf_yield_vs_5y_median", "relvalue", "T5", "numeric", "ocf_yield / median of its 20q historical values", added_in_version="1.3"),
+    _f("ocf_yield_5y_pctile", "relvalue", "T5", "numeric", "midrank percentile of ocf_yield within its 20q history", rank="none", added_in_version="1.3"),
+    _f("fcf_yield_vs_5y_median", "relvalue", "T5", "numeric", "fcf_yield / median of its 20q historical values", added_in_version="1.3"),
+    _f("fcf_yield_5y_pctile", "relvalue", "T5", "numeric", "midrank percentile of fcf_yield within its 20q history", rank="none", added_in_version="1.3"),
+    _f("sales_yield_vs_5y_median", "relvalue", "T5", "numeric", "sales_yield / median of its 20q historical values", rank='pinned', pin_rank=0.0, added_in_version="1.3"),
+    _f("sales_yield_5y_pctile", "relvalue", "T5", "numeric", "midrank percentile of sales_yield within its 20q history", rank="none", added_in_version="1.3"),
+    _f("book_to_market_vs_5y_median", "relvalue", "T5", "numeric", "book_to_market / median of its 20q historical values", added_in_version="1.3"),
+    _f("book_to_market_5y_pctile", "relvalue", "T5", "numeric", "midrank percentile of book_to_market within its 20q history", rank="none", added_in_version="1.3"),
+    _f("tangible_book_to_market_vs_5y_median", "relvalue", "T5", "numeric", "tangible_book_to_market / median of its 20q historical values", added_in_version="1.3"),
+    _f("tangible_book_to_market_5y_pctile", "relvalue", "T5", "numeric", "midrank percentile of tangible_book_to_market within its 20q history", rank="none", added_in_version="1.3"),
     # ---- solvency / distress ----------------------------------------------
     _f("wc_to_assets", "solvency", "T0", "numeric", "workingcapital_q / assets_q"),
     _f("retearn_to_assets", "solvency", "T0", "numeric", "retearn_q / assets_q"),
@@ -204,6 +219,7 @@ FEATURES: tuple[FeatureSpec, ...] = (
     _f("altman_z", "solvency", "T0", "numeric", "1.2 wc/ta + 1.4 re/ta + 3.3 ebit/ta + 0.6 mve/tl + 1.0 s/ta"),
     _f("altman_z_dd", "solvency", "T0", "numeric", "6.56 wc/ta + 3.26 re/ta + 6.72 ebit/ta + 1.05 bve/tl"),
     _f("zmijewski", "solvency", "T0", "numeric", "-4.336 - 4.513 roa + 5.679 tl/ta + 0.004 ca/cl"),
+    _f("ohlson_o", "solvency", "T1", "numeric", "Ohlson (1980) model-1 O-score, size = ln(assets $M) undeflated", added_in_version="1.3"),
     # ---- earnings quality (Beneish inputs are ART pairs, T1) ---------------
     _f("dsri", "quality", "T1", "numeric", "(receivables_q/revenue) YoY ratio"),
     _f("gmi", "quality", "T1", "numeric", "gross_margin[-1] / gross_margin", rank="pinned", pin_value=1.0, pin_rank=0.5),
@@ -215,6 +231,15 @@ FEATURES: tuple[FeatureSpec, ...] = (
     _f("accruals_to_assets", "quality", "T0", "numeric", "(netinc - ncfo) / assets_q", sector_rank=True),
     _f("beneish_m", "quality", "T1", "numeric", "Beneish M composite over the 8 indices"),
     _f("piotroski_f", "quality", "T1", "numeric", "count of the 9 F-score signals", rank="none"),
+    _f("piotroski_roa_positive", "quality", "T0", "flag", "roa > 0", added_in_version="1.3"),
+    _f("piotroski_cfo_positive", "quality", "T0", "flag", "ncfo > 0", added_in_version="1.3"),
+    _f("piotroski_roa_up", "quality", "T1", "flag", "roa > roa[-1]", added_in_version="1.3"),
+    _f("piotroski_cfo_gt_ni", "quality", "T0", "flag", "ncfo > netinc (accruals)", added_in_version="1.3"),
+    _f("piotroski_leverage_down", "quality", "T1", "flag", "debtnc_q/assets_q < debtnc_q[-1]/assets_q[-1]", added_in_version="1.3"),
+    _f("piotroski_liquidity_up", "quality", "T1", "flag", "current_ratio > current_ratio[-1]", added_in_version="1.3"),
+    _f("piotroski_no_issuance", "quality", "T0", "flag", "ncfcommon <= 0", added_in_version="1.3"),
+    _f("piotroski_margin_up", "quality", "T1", "flag", "gross_margin > gross_margin[-1]", added_in_version="1.3"),
+    _f("piotroski_turnover_up", "quality", "T1", "flag", "asset_turnover > asset_turnover[-1]", added_in_version="1.3"),
     _f("noa_to_assets", "quality", "T1", "numeric", "net operating assets / assets_q[-1]"),
     _f("ext_financing_to_assets", "quality", "T0", "numeric", "(ncfcommon + ncfdebt) / assets_q", rank="pinned", pin_rank=0.5),
     _f("rnd_to_assets", "quality", "T0", "numeric", "coalesce(rnd, 0) / assets_q (unreported R&D = 0, ADR 0013)", rank="pinned", pin_rank=0.0),
@@ -224,11 +249,16 @@ FEATURES: tuple[FeatureSpec, ...] = (
     _f("mohanram_g7", "quality", "T3", "numeric", "7-signal G-score vs. famaindustry medians", rank="none", assembly_stage=True),
     # ---- technical (from SEP; differs across snapshot kinds) ----------------
     _f("mom_12_2", "technical", "P12", "numeric", "total return t-252 -> t-21"),
+    _f("mom_36_12", "technical", "P36", "numeric", "total return t-756 -> t-252 (long-term reversal)", added_in_version="1.3"),
     _f("ret_6m", "technical", "P12", "numeric", "total return t-126 -> t"),
     _f("ret_1m", "technical", "P12", "numeric", "total return t-21 -> t", rank="pinned", pin_rank=0.5),
+    _f("max_ret_21d", "technical", "P12", "numeric", "max one-day return over the last 21 trading days, >=15 obs", rank="pinned", pin_rank=0.0, added_in_version="1.3"),
     _f("vol_12m", "technical", "P12", "numeric", "ann. sigma of daily log returns, >=200 obs"),
     _f("vol_36m", "technical", "P36", "numeric", "ann. sigma over 756d, >=600 obs"),
+    _f("beta_12m", "technical", "P12", "numeric", "regr_slope of daily log returns on SPY's, 252d, >=200 obs", added_in_version="1.3"),
     _f("dist_52w_high", "technical", "P12", "numeric", "closeadj / max_252d closeadj - 1", rank="pinned", pin_rank=1.0),
+    _f("dist_5y_high", "technical", "P60", "numeric", "closeadj / max_1260d closeadj - 1, >=1000 obs", rank="pinned", pin_rank=1.0, added_in_version="1.3"),
+    _f("price_vs_5y_avg", "technical", "P60", "numeric", "closeadj / mean_1260d closeadj - 1, >=1000 obs", added_in_version="1.3"),
     _f("log_marketcap", "technical", "T0", "numeric", "ln(marketcap)"),
     _f("dollar_volume_3m", "technical", "P12", "numeric", "median daily close*volume, t-63 -> t"),
     _f("amihud_12m", "technical", "P12", "numeric", "mean |ret| / (close*volume)"),

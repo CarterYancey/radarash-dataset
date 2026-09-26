@@ -392,6 +392,23 @@ def test_conservative_score_hand_check(assembled_world):
     ) == (None,)
 
 
+def test_magic_formula_score_hand_check(assembled_world):
+    # EBIT 70 everywhere; EV = 100 * price + 250 - 100 = 1150 / 2150 / 4150
+    # -> ebit_to_ev ranks 1 / 0.5 / 0. Identical balance sheets tie ROC at
+    # 70 / (200 + 300) = 0.14 -> rank 0 for all (ADR 0020 rank-sum).
+    rows = machinery(
+        assembled_world,
+        "ebit_to_ev, ebit_to_ev_rank, roc_greenblatt, roc_greenblatt_rank, "
+        "magic_formula_score, magic_formula_score_rank",
+        "2017-04-03",
+    )
+    assert rows == [
+        pytest.approx((70 / 1150, 1.0, 0.14, 0.0, 1.0, 1.0)),
+        pytest.approx((70 / 2150, 0.5, 0.14, 0.0, 0.5, 0.5)),
+        pytest.approx((70 / 4150, 0.0, 0.14, 0.0, 0.0, 0.0)),
+    ]
+
+
 def test_pinned_ranks(assembled_world):
     """ADR 0016 pinned: rows at the pin value sit at the pin rank in every
     quarter; the rest are percent-ranked on their side of the pin."""
@@ -562,7 +579,7 @@ def test_rank_audit(assembled_world):
     audited = set(manifest["rank_audit"]["columns"])
     assert audited <= set(rank_columns()) | set(secrank_columns())
     assert {"sales_yield_rank", "sales_yield_secrank", "vol_36m_rank",
-            "conservative_score_rank"} <= audited
+            "conservative_score_rank", "magic_formula_score_rank"} <= audited
     policy = manifest["rank_policy"]
 
     def pinned(value, rank):

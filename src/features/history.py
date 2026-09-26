@@ -12,7 +12,10 @@ columns:
   inference, ADR 0014). Off-grid filings (fiscal-year changes) match no
   bucket. Carries the trend series (`revenue`, `tangibles`, `ncfo`) plus
   the adjacent-quarter previous values (`prev_*`, valid when
-  `prev_qoff = qoff + 1`).
+  `prev_qoff = qoff + 1`), and for the relative-value family the bucket
+  filing's own `netinc`, `fcf`, `equity`, `shares` (`sharesbas × sharefactor`),
+  `bucket_datekey` and `bucket_reportperiod` (its historical market cap is
+  priced in src/features/relvalue.py).
 - **`div_history`** — one row per snapshot × fiscal-year offset `yoff`
   (0..9), same matching at 365.25-day spacing, carrying the TTM cash
   dividend `div_ttm = −ncfdiv` plus `prev_yoff`/`prev_div_ttm` and `streak_ok`
@@ -94,7 +97,11 @@ def build_fund_history_view(
         offset_name="qoff",
         value_cols=(
             "f.f_revenue AS revenue, f.l_tangibles AS tangibles, "
-            "f.f_ncfo AS ncfo"
+            "f.f_ncfo AS ncfo, f.f_netinc AS netinc, f.f_fcf AS fcf, "
+            "f.l_equity AS equity, "
+            "f.l_sharesbas * f.l_sharefactor AS shares, "
+            "f.datekey AS bucket_datekey, "
+            "f.reportperiod AS bucket_reportperiod"
         ),
     )
     con.execute(

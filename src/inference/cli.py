@@ -7,6 +7,7 @@ Inputs (produced by `sharadar-ingest` and `sharadar-identity`):
 
     data/raw/SF1.parquet                  as-reported fundamentals
     data/raw/SEP.parquet                  daily prices
+    data/raw/SFP.parquet                  benchmark (SPY) prices, market beta
     data/interim/ticker_permaticker.parquet
     data/interim/universe.parquet
 
@@ -117,6 +118,7 @@ def main(argv: list[str] | None = None) -> int:
     inputs = {
         "SF1": (raw_dir / "SF1.parquet", "sharadar-ingest --tables SF1"),
         "SEP": (raw_dir / "SEP.parquet", "sharadar-ingest --tables SEP"),
+        "SFP": (raw_dir / "SFP.parquet", "sharadar-ingest --tables SFP"),
         "mapping": (
             interim_dir / "ticker_permaticker.parquet",
             "sharadar-identity",
@@ -150,6 +152,7 @@ def main(argv: list[str] | None = None) -> int:
             mapping_parquet=inputs["mapping"][0],
             universe_parquet=inputs["universe"][0],
             snapshots_parquet=None,
+            sfp_parquet=inputs["SFP"][0],
         )
         as_of = resolve_as_of(con, args.as_of)
         if as_of is None:

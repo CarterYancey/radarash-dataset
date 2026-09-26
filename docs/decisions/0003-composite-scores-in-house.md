@@ -1,7 +1,8 @@
 # 0003 — Composite scores: compute in-house; store components and composites
 
 Date: 2026-07-13
-Status: accepted
+Status: accepted; the Ohlson O deferral below is lifted by
+[0020](0020-standard-scores.md) (nominal size term, documented deviation)
 
 ## Context
 

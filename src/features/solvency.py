@@ -1,7 +1,9 @@
 """Solvency / distress family: Altman-Z, Ohlson-O, and Zmijewski components
 plus the canonical composites (ADR 0003).
 
-Composites are NULL when any component is NULL. `interest_coverage` is NULL
+Composites are NULL when any component is NULL. `ohlson_o` (ADR 0020) is
+Ohlson's (1980) model-1 score over the family's own components, with
+`ln(assets in $M)` for the GNP-deflated size term. `interest_coverage` is NULL
 when intexp <= 0 (no debt => NULL, not infinity); `ffo_to_liabilities`
 proxies FFO with CFO (research §F1 gap); `log_assets` is nominal (the rank
 representation absorbs the drift, ADR 0008).
@@ -25,6 +27,19 @@ def build_solvency_view(con: duckdb.DuckDBPyConnection) -> None:
     roa = safe_div("b.f_netinc", "b.l_assets")
     tl_ta = safe_div("b.l_liabilities", "b.l_assets")
     ca_cl = safe_div("b.l_assetsc", "b.l_liabilitiesc")
+    cl_ca = safe_div("b.l_liabilitiesc", "b.l_assetsc")
+    ffo_tl = safe_div("b.f_ncfo", "b.l_liabilities")
+    chin = safe_div("b.f_netinc - b.f1_netinc",
+                    "abs(b.f_netinc) + abs(b.f1_netinc)")
+    two_year_loss = "b.f_netinc < 0 AND b.f1_netinc < 0"
+    liab_gt_assets = "b.l_liabilities > b.l_assets"
+    ohlson_o = (
+        f"-1.32 - 0.407 * {safe_ln('b.l_assets / 1e6')}"
+        f" + 6.03 * ({tl_ta}) - 1.43 * ({wc_ta}) + 0.0757 * ({cl_ca})"
+        f" - 1.72 * CAST({liab_gt_assets} AS INTEGER) - 2.37 * ({roa})"
+        f" - 1.83 * ({ffo_tl}) + 0.285 * CAST({two_year_loss} AS INTEGER)"
+        f" - 0.521 * ({chin})"
+    )
     con.execute(
         f"""
         CREATE OR REPLACE TEMP VIEW features_solvency AS
@@ -35,7 +50,7 @@ def build_solvency_view(con: duckdb.DuckDBPyConnection) -> None:
                {mve_tl} AS marketcap_to_liabilities,
                {bve_tl} AS equity_to_liabilities,
                {tl_ta} AS liabilities_to_assets,
-               {safe_div('b.l_liabilitiesc', 'b.l_assetsc')} AS cl_to_ca,
+               {cl_ca} AS cl_to_ca,
                {ca_cl} AS current_ratio,
                {safe_div('b.l_assetsc - b.l_inventory', 'b.l_liabilitiesc')}
                    AS quick_ratio,
@@ -44,19 +59,18 @@ def build_solvency_view(con: duckdb.DuckDBPyConnection) -> None:
                {safe_div('b.l_debt - b.l_cashneq', 'b.f_ebitda')}
                    AS net_debt_to_ebitda,
                {safe_div('b.f_ebit', 'b.f_intexp')} AS interest_coverage,
-               {safe_div('b.f_ncfo', 'b.l_liabilities')} AS ffo_to_liabilities,
+               {ffo_tl} AS ffo_to_liabilities,
                {safe_ln('b.l_assets')} AS log_assets,
-               {safe_div('b.f_netinc - b.f1_netinc',
-                         'abs(b.f_netinc) + abs(b.f1_netinc)')}
-                   AS ni_change_scaled,
-               b.f_netinc < 0 AND b.f1_netinc < 0 AS two_year_loss,
-               b.l_liabilities > b.l_assets AS liab_gt_assets,
+               {chin} AS ni_change_scaled,
+               {two_year_loss} AS two_year_loss,
+               {liab_gt_assets} AS liab_gt_assets,
                1.2 * ({wc_ta}) + 1.4 * ({re_ta}) + 3.3 * ({ebit_ta})
                    + 0.6 * ({mve_tl}) + 1.0 * ({sales_ta}) AS altman_z,
                6.56 * ({wc_ta}) + 3.26 * ({re_ta}) + 6.72 * ({ebit_ta})
                    + 1.05 * ({bve_tl}) AS altman_z_dd,
                -4.336 - 4.513 * ({roa}) + 5.679 * ({tl_ta})
-                   + 0.004 * ({ca_cl}) AS zmijewski
+                   + 0.004 * ({ca_cl}) AS zmijewski,
+               {ohlson_o} AS ohlson_o
         FROM fund_base b
         JOIN market_inputs m
           USING (permaticker, snapshot_date, snapshot_kind)

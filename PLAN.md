@@ -99,6 +99,8 @@ Categories (initial set; research workspace in `docs/research/features.md`,
 final registry in `docs/features.md`):
 
 1. **Valuation:** P/B, P/S, P/E, EV/EBITDA, EV/EBIT, earnings yield, FCF yield. Piotroski F-score, Magic formula, Conservative formula, etc.
+   Also valuation against the stock's *own* 5-year history (cheap for this
+   stock, not just vs. the cross-section — decision 0018).
 2. **Solvency / distress (Altman-Z-style, Ohlson O-score, etc):** working capital / assets,
    retained earnings / assets, EBIT / assets, market equity / total liabilities,
    sales / assets; debt/equity, interest coverage, current ratio.
@@ -107,7 +109,10 @@ final registry in `docs/features.md`):
 4. **Profitability & growth:** ROE, ROA, ROIC, gross margin, margin trends,
    revenue/EPS growth (YoY from ARQ history).
 5. **Technical (small set):** trailing 6m/12m total return, 12m volatility,
-   distance from 52-week high, market cap (log).
+   distance from 52-week high, market cap (log); from v1.4 the long-window
+   anchors (distance from the 5-year high, price vs. 5-year average,
+   36→12-month reversal), the MAX factor and 12-month market beta
+   (decision 0019).
 6. **Market-regime (candidate, see TODO.md):** snapshot-date market
    conditions — e.g., S&P 500 P/S or P/E, trailing market return/volatility.
    Consistent with the project thesis (deep value *relative to the prevailing

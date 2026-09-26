@@ -5,7 +5,9 @@ Beneish indices are ART pairs lagged one fiscal year (research §F2.2).
 `piotroski_f` counts the 9 signals from the shared components; signal 5
 (leverage down) uses non-current debt over current-quarter assets — F2.2's
 field choice under the registry's current-level denominator convention —
-and signal 7 uses the cash-flow convention `ncfcommon <= 0`. Composites
+and signal 7 uses the cash-flow convention `ncfcommon <= 0`. The nine
+signals also ship as flag columns `piotroski_*` (ADR 0020), NULL when
+their inputs are, so a model can weight them individually. Composites
 are NULL when any component/signal is NULL. `mohanram_g7` is
 assembly-stage (M5) and not emitted here.
 """
@@ -71,21 +73,30 @@ def build_quality_view(con: duckdb.DuckDBPyConnection) -> None:
     ))
     at = safe_div("b.f_revenue", "b.l_assets")
     at_l1 = safe_div("b.f1_revenue", "b.l1_assets")
-    f_signals = " + ".join(
-        f"CAST(({sig}) AS INTEGER)"
-        for sig in (
-            f"({roa}) > 0",
-            "b.f_ncfo > 0",
-            f"({roa}) - ({roa_l1}) > 0",
-            "b.f_ncfo > b.f_netinc",
+    # The nine F-score signals, in Piotroski's order (column names are the
+    # registry's `piotroski_*` flags).
+    f_signals = {
+        "piotroski_roa_positive": f"({roa}) > 0",
+        "piotroski_cfo_positive": "b.f_ncfo > 0",
+        "piotroski_roa_up": f"({roa}) - ({roa_l1}) > 0",
+        "piotroski_cfo_gt_ni": "b.f_ncfo > b.f_netinc",
+        "piotroski_leverage_down": (
             f"({safe_div('b.l_debtnc', 'b.l_assets')})"
-            f" < ({safe_div('b.l1_debtnc', 'b.l1_assets')})",
+            f" < ({safe_div('b.l1_debtnc', 'b.l1_assets')})"
+        ),
+        "piotroski_liquidity_up": (
             f"({safe_div('b.l_assetsc', 'b.l_liabilitiesc')})"
-            f" > ({safe_div('b.l1_assetsc', 'b.l1_liabilitiesc')})",
-            "b.f_ncfcommon <= 0",
-            f"({gm}) - ({gm_l1}) > 0",
-            f"({at}) - ({at_l1}) > 0",
-        )
+            f" > ({safe_div('b.l1_assetsc', 'b.l1_liabilitiesc')})"
+        ),
+        "piotroski_no_issuance": "b.f_ncfcommon <= 0",
+        "piotroski_margin_up": f"({gm}) - ({gm_l1}) > 0",
+        "piotroski_turnover_up": f"({at}) - ({at_l1}) > 0",
+    }
+    f_score = " + ".join(
+        f"CAST(({sig}) AS INTEGER)" for sig in f_signals.values()
+    )
+    f_flags = ",\n               ".join(
+        f"{sig} AS {name}" for name, sig in f_signals.items()
     )
 
     con.execute(
@@ -103,7 +114,8 @@ def build_quality_view(con: duckdb.DuckDBPyConnection) -> None:
                -4.84 + 0.92 * ({dsri}) + 0.528 * ({gmi}) + 0.404 * ({aqi})
                      + 0.892 * ({sgi}) + 0.115 * ({depi}) - 0.172 * ({sgai})
                      + 4.679 * ({tata}) - 0.327 * ({lvgi}) AS beneish_m,
-               {f_signals} AS piotroski_f,
+               {f_score} AS piotroski_f,
+               {f_flags},
                {safe_div('(b.l_assets - b.l_cashneq - b.l_investments)'
                          ' - (b.l_liabilities - b.l_debt)', 'b.l1_assets')}
                    AS noa_to_assets,

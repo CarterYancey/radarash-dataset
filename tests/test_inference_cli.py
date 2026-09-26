@@ -145,6 +145,13 @@ def build_sep_csv() -> str:
     return "\n".join(lines) + "\n"
 
 
+def build_sfp_csv() -> str:
+    lines = ["ticker,date,close,closeadj,lastupdated"]
+    for day in weekdays(BASE, END):
+        lines.append(f"SPY,{day},100.0,100.0,2026-07-01")
+    return "\n".join(lines) + "\n"
+
+
 GUARD_ARGS = ["--rank-guard", "3", "--min-industry-peers", "3"]
 
 
@@ -157,6 +164,7 @@ def inference_world(tmp_path_factory) -> Path:
         ("TICKERS", TICKERS_CSV),
         ("SF1", build_sf1_csv()),
         ("SEP", build_sep_csv()),
+        ("SFP", build_sfp_csv()),
     ):
         csv_path = data_dir / f"{name}_fixture.csv"
         csv_path.write_text(csv_text)
@@ -325,7 +333,7 @@ def test_manifest(inference_world):
         "rank": "pinned", "pin_value": 0.0, "pin_rank": 0.0,
     }
     assert "labels" not in manifest["columns"]
-    assert set(manifest["input_rows"]) == {"SF1", "SEP", "mapping", "universe"}
+    assert set(manifest["input_rows"]) == {"SF1", "SEP", "SFP", "mapping", "universe"}
 
 
 def test_as_of_in_the_past(inference_world):

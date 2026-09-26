@@ -1,7 +1,7 @@
 """CLI: assemble the versioned training dataset (M5).
 
-    sharadar-assemble                       # writes data/datasets/dataset_v1.2/
-    sharadar-assemble --dataset-version 1.3 --rank-guard 20
+    sharadar-assemble                       # writes data/datasets/dataset_v1.4/
+    sharadar-assemble --dataset-version 1.4 --rank-guard 20
 
 Inputs (produced by `sharadar-labels`, `sharadar-features`, `sharadar-splits`):
 
@@ -42,7 +42,7 @@ from .wide import MIN_INDUSTRY_PEERS, RANK_GUARD, build_wide_views
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_VERSION = "1.2"
+DEFAULT_VERSION = "1.4"
 
 
 def build_parser() -> argparse.ArgumentParser:

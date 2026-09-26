@@ -14,7 +14,7 @@ this manual tells you how to *use* them together. Design rationale: PLAN.md.
 One versioned, immutable directory:
 
 ```
-dataset_v1.2/
+dataset_v1.4/
 ├── dataset.parquet       one row per snapshot: key, features, ranks, labels, weights
 ├── splits.parquet        role tags per (scheme, fold, horizon, snapshot)
 ├── split_folds.parquet   frozen fold manifest (boundaries + role counts)
@@ -56,7 +56,7 @@ Use the manifest to select feature columns — don't pattern-match names:
 ```python
 import json
 
-DATASET = "data/datasets/dataset_v1.2"
+DATASET = "data/datasets/dataset_v1.4"
 cols = json.load(open(f"{DATASET}/manifest.json"))["columns"]
 feature_cols = cols["features"] + cols["ranks"] + cols["sector_ranks"]
 ```
@@ -99,6 +99,22 @@ in which case exclude the listed columns from rank-fed models.
 change semantics. Do not compare rank-fed results across it; bump
 `min_dataset_version` on rank-fed configs. Raw columns and flags are
 unchanged.
+
+**v1.4 adds the relative-value family** (decision 0018, additive — no
+existing column changes): the six marketcap yields (earnings, OCF, FCF,
+sales, book, tangible book) against the stock's *own* last 20 quarters
+(`*_vs_5y_median`, ranked; `*_5y_pctile`, raw only — prefer it for the
+sign-changing earnings/cash-flow yields, whose median ratio is NULL when
+the historical median is ≤ 0). NULL for stocks without ~3 years of
+priced history — keep the NULLs. The technical family gains the matching
+price-only anchors (decision 0019): `dist_5y_high`, `price_vs_5y_avg`
+(NULL under ~4 years of prints), `mom_36_12`, plus `max_ret_21d` and
+`beta_12m`. Standard scores (decision 0020): `ohlson_o` (distress,
+higher = worse), the assembly-stage `magic_formula_score`, and the nine
+Piotroski signals as `piotroski_*` flags beside `piotroski_f` — a NULL
+flag means "unknown" (e.g. no prior-year filing), not "failed". They answer "cheap for *this* stock", which the
+cross-sectional ranks cannot; pair them with the level ranks rather than
+replacing them.
 
 Every feature is point-in-time: it reflects only information publicly
 available on or before `snapshot_date`. Do not "enrich" rows by joining

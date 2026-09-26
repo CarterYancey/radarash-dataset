@@ -6,5 +6,6 @@ from shared foundation views (`base` for as-of/lag fundamentals, `market`
 for snapshot-date marketcap/EV) and each writes
 data/interim/features/{family}.parquet on the labels key
 (permaticker, snapshot_date, snapshot_kind). Ranks and the assembly-stage
-composites (mohanram_g7, conservative_score) are computed at assembly (M5).
+composites (mohanram_g7, conservative_score, magic_formula_score) are
+computed at assembly (M5).
 """

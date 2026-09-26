@@ -8,7 +8,10 @@
 [0007](decisions/0007-market-inputs-daily-pit.md) (market inputs),
 [0008](decisions/0008-rank-representation.md) (ranks),
 [0015](decisions/0015-trend-consistency-features.md) (trend & consistency, v1.1),
-[0016](decisions/0016-rank-quarter-keys.md) (per-feature rank policy, v1.2).
+[0016](decisions/0016-rank-quarter-keys.md) (per-feature rank policy, v1.2),
+[0018](decisions/0018-relative-value-features.md) (relative value, v1.4),
+[0019](decisions/0019-long-window-price-features.md) (long-window price features, v1.4),
+[0020](decisions/0020-standard-scores.md) (O-score, magic formula, F-score flags, v1.4).
 `src/features/` implements this registry in the build order below.
 Research trail: [research/features.md](research/features.md).
 
@@ -57,8 +60,8 @@ versions diffable from the registry alone.
   ranked. Assembly audits every rank column for calendar-quarter keys and
   refuses a build that carries one (dataset.md).
 - **Tiers** (ADR 0004): T0 current filing; T1/T2/T3 = +1/2/3 fiscal years;
-  P12/P36 = 252/756 trading days of `SEP.closeadj`; T5/T10 = +20 quarters /
-  +10 fiscal years (ADR 0015). Tier = what the feature *needs*; unmet ⇒
+  P12/P36/P60 = 252/756/1260 trading days of `SEP.closeadj` (P60: ADR 0019);
+  T5/T10 = +20 quarters / +10 fiscal years (ADR 0015). Tier = what the feature *needs*; unmet ⇒
   NULL — except the windowed trend family, whose tier states the full
   window while partial histories degrade per its min-count rules.
 - **Quarterly/annual history windows** (ADR 0015): the lag-q (lag-y)
@@ -100,6 +103,7 @@ versions diffable from the registry alone.
 | `net_payout_yield` | T0 | `−(ncfdiv + ncfcommon) / marketcap` | Conservative-formula input; pinned rank (0.5) — signed, no payout or issuance at 0.5 |
 | `ncav_to_marketcap` | T0 ⌂ | `(assetsc_q − liabilities_q) / marketcap` | Graham net-net discount |
 | `ev_to_marketcap` | T0 | `ev / marketcap` | leverage-in-price; negative-EV magnitude; pinned rank (0.5 at raw 1) — no net debt at 0.5 |
+| `magic_formula_score` | T0 ⌂ | `ebit_to_ev_rank + roc_greenblatt_rank` | **assembly-stage** composite (needs ranks; ADR 0020): Greenblatt's rank-sum, higher = better, range [0, 2]; NULL if either rank is; added v1.4 |
 
 ## Profitability
 
@@ -198,6 +202,41 @@ dividend year ⇒ the dividend counters are NULL.
 | `div_cuts_10y` | T10 | YoY TTM dividend drops below 0.8× prior, last 10y | omission counts as a cut; not ranked (count) |
 | `div_history_years_10y` | T10 | annual dividend observations known, last 10 | denominator context; not ranked (count) |
 
+## Relative value (ADR 0018; added in v1.4)
+
+Valuation against the stock's **own** past, not the cross-section: is it
+cheaper than *it* usually is? Each quarterly history bucket (the 20q
+`fund_history` window above, qoff 0…19) is priced at its own historical
+market cap — `close × sharesbas × sharefactor` of that bucket's filing
+(ADR 0007 convention, no DAILY), with `close` the SEP `close` (the field
+the snapshot marketcap uses) on the last trading day on or before the anchor `least(datekey,
+reportperiod + 45d)`, NULL when that print is more than 14 days older than
+the anchor (pre-listing history, halts). The anchor never passes the
+bucket filing's `datekey`, so every input is public at the snapshot. The
+current value is the snapshot-date valuation ratio (Valuation above;
+same numerators: ART TTM `netinc`/`ncfo`/`fcf`/`revenue`, ARQ
+`equity`/`tangibles`). For the sign-changing ratios the percentile is the
+robust statistic: it is defined whatever the signs, while the median ratio
+needs a positive historical median. Both statistics need ≥ 11 priced
+historical values (ADR 0015's 20q rule) and a current value; missing stays
+NULL — including for young listings and the first ~3 years of the data
+floor, where the absence of a history is itself the signal.
+
+| column | tier | definition | notes |
+|---|---|---|---|
+| `earnings_yield_vs_5y_median` | T5 | `earnings_yield / median(historical earnings_yield)` | > 1 ⇒ cheaper than its own norm; NULL if the median ≤ 0; a current loss is kept (below 0) |
+| `earnings_yield_5y_pctile` | T5 | `(#hist < cur + ½·#hist = cur) / n` over the historical `earnings_yield` values | 1 ⇒ cheaper than every past bucket; not ranked (share) |
+| `ocf_yield_vs_5y_median` | T5 | `ocf_yield / median(historical ocf_yield)` | NULL if the median ≤ 0; current cash burn is kept (below 0) |
+| `ocf_yield_5y_pctile` | T5 | same midrank percentile over historical `ocf_yield` | not ranked (share) |
+| `fcf_yield_vs_5y_median` | T5 | `fcf_yield / median(historical fcf_yield)` | NULL if the median ≤ 0; current negative FCF is kept (below 0) |
+| `fcf_yield_5y_pctile` | T5 | same midrank percentile over historical `fcf_yield` | not ranked (share) |
+| `sales_yield_vs_5y_median` | T5 | `sales_yield / median(historical sales_yield)` | NULL if the median ≤ 0; pinned rank (0) — revenue gone to zero |
+| `sales_yield_5y_pctile` | T5 | same midrank percentile over historical `sales_yield` | not ranked (share) |
+| `book_to_market_vs_5y_median` | T5 | `book_to_market / median(historical book_to_market)` | NULL if the median ≤ 0; negative current book kept (below 0) |
+| `book_to_market_5y_pctile` | T5 | same midrank percentile over historical `book_to_market` | not ranked (share) |
+| `tangible_book_to_market_vs_5y_median` | T5 | `tangible_book_to_market / median(historical tangible_book_to_market)` | NULL if the median ≤ 0; negative current tangible book kept (below 0) |
+| `tangible_book_to_market_5y_pctile` | T5 | same midrank percentile over historical `tangible_book_to_market` | not ranked (share) |
+
 ## Solvency / distress
 
 | column | tier | definition | notes |
@@ -223,9 +262,9 @@ dividend year ⇒ the dividend counters are NULL.
 | `altman_z` | T0 ⌂⌐ | `1.2·wc/ta + 1.4·re/ta + 3.3·ebit/ta + 0.6·mve/tl + 1.0·s/ta` | composite; literature comparability |
 | `altman_z_dd` | T0 ⌂⌐ | `6.56·wc/ta + 3.26·re/ta + 6.72·ebit/ta + 1.05·bve/tl` | Z'' — featured variant (mixed universe) |
 | `zmijewski` | T0 ⌂ | `−4.336 − 4.513·roa + 5.679·tl/ta + 0.004·ca/cl` | composite |
+| `ohlson_o` | T1 ⌂ | `−1.32 − 0.407·ln(assets_q/10⁶) + 6.03·tl/ta − 1.43·wc/ta + 0.0757·cl/ca − 1.72·liab_gt_assets − 2.37·roa − 1.83·ffo/tl + 0.285·two_year_loss − 0.521·ni_change_scaled` | composite (ADR 0020); higher = more distress; size term nominal, not GNP-deflated (documented deviation); added v1.4 |
 
-Composites are NULL when any component is NULL (⌂⌐ inherited); the Ohlson
-composite is deferred (ADR 0003) — its components are all above.
+Composites are NULL when any component is NULL (⌂⌐ inherited).
 
 ## Earnings quality (Beneish inputs are ART pairs, T1)
 
@@ -241,6 +280,15 @@ composite is deferred (ADR 0003) — its components are all above.
 | `accruals_to_assets` | T0 | `(netinc − ncfo) / assets_q` | S; TATA & Sloan accruals (CF method), one column |
 | `beneish_m` | T1 ⌂ | `−4.84 + 0.92·dsri + 0.528·gmi + 0.404·aqi + 0.892·sgi + 0.115·depi − 0.172·sgai + 4.679·tata − 0.327·lvgi` | composite |
 | `piotroski_f` | T1 | count of the 9 signals (research §F2.2 table) | composite, 0–9; signals from components above + `ncfcommon ≤ 0`; not ranked (integer score, ADR 0016) |
+| `piotroski_roa_positive` | T0 | `roa > 0` | flag; F-score signal 1; added v1.4 |
+| `piotroski_cfo_positive` | T0 | `ncfo > 0` | flag; F-score signal 2; added v1.4 |
+| `piotroski_roa_up` | T1 | `roa > roa[-1]` | flag; F-score signal 3; added v1.4 |
+| `piotroski_cfo_gt_ni` | T0 | `ncfo > netinc (accruals)` | flag; F-score signal 4; added v1.4 |
+| `piotroski_leverage_down` | T1 | `debtnc_q/assets_q < debtnc_q[-1]/assets_q[-1]` | flag; F-score signal 5; added v1.4 |
+| `piotroski_liquidity_up` | T1 ⌂ | `current_ratio > current_ratio[-1]` | flag; F-score signal 6; added v1.4 |
+| `piotroski_no_issuance` | T0 | `ncfcommon <= 0` | flag; F-score signal 7; added v1.4 |
+| `piotroski_margin_up` | T1 | `gross_margin > gross_margin[-1]` | flag; F-score signal 8; added v1.4 |
+| `piotroski_turnover_up` | T1 | `asset_turnover > asset_turnover[-1]` | flag; F-score signal 9; added v1.4 |
 | `noa_to_assets` | T1 | `((assets_q − cashneq_q − investments_q) − (liabilities_q − debt_q)) / assets_q₋₁` | Hirshleifer NOA |
 | `ext_financing_to_assets` | T0 | `(ncfcommon + ncfdebt) / assets_q` | Bradshaw–Richardson–Sloan; pinned rank (0.5) — signed, no external financing at 0.5 |
 | `rnd_to_assets` | T0 | `coalesce(rnd, 0) / assets_q` | G-score input; unreported R&D counts as 0 — the one explicit fill (ADR 0013); pinned rank (0) |
@@ -254,11 +302,16 @@ composite is deferred (ADR 0003) — its components are all above.
 | column | tier | definition | notes |
 |---|---|---|---|
 | `mom_12_2` | P12 | total return t−252 → t−21 | S is not applied; plain rank only |
+| `mom_36_12` | P36 | total return t−756 → t−252 | long-term reversal (De Bondt–Thaler): 3y return excluding the last year; added v1.4 |
 | `ret_6m` | P12 | total return t−126 → t | |
 | `ret_1m` | P12 | total return t−21 → t | short-term reversal; pinned rank (0.5) — no price change at 0.5 |
+| `max_ret_21d` | P12 | max one-day `closeadj` return over the last 21 trading days | lottery/MAX factor; true one-day returns only, ≥ 15 of them; pinned rank (0) — no up day; added v1.4 |
 | `vol_12m` | P12 | ann. σ of daily log returns, ≥200 obs | |
 | `vol_36m` | P36 | same over 756d, ≥600 obs | Conservative-formula input |
+| `beta_12m` | P12 | `regr_slope` of daily log returns on the benchmark's (SFP `SPY` `closeadj`), last 252d | days where both moved one trading day only, ≥ 200 pairs; plain daily beta (thin traders bias it toward 0); added v1.4 |
 | `dist_52w_high` | P12 | `closeadj / max₍t−252…t₎ closeadj − 1` | ≤ 0; pinned rank (1) — at the 52-week high sits at the top |
+| `dist_5y_high` | P60 | `closeadj / max₍t−1260…t₎ closeadj − 1` | the stock's own 5y drawdown at entry; ≥ 1000 prints in-window, else NULL (a young listing has no 5y high); ≤ 0; pinned rank (1); added v1.4 |
+| `price_vs_5y_avg` | P60 | `closeadj / mean₍t−1260…t₎ closeadj − 1` | slow mean-reversion anchor; ≥ 1000 prints; added v1.4 |
 | `log_marketcap` | T0 | `ln(marketcap)` | |
 | `dollar_volume_3m` | P12 | median daily `close × volume`, t−63 → t | liquidity column (TODO microcap question) |
 | `amihud_12m` | P12 | mean `|ret| / (close × volume)` | illiquidity |
@@ -287,10 +340,11 @@ diff once two ingest vintages exist.
 
 `base` (as-of + lag resolution), `history` (quarterly/annual buckets,
 ADR 0015) and `market` (marketcap/EV) → `valuation` →
-`profitability` + `growth` → `trend` → `solvency` → `quality` →
+`profitability` + `growth` → `trend` → `relvalue` → `solvency` → `quality` →
 `technical` → `classification`; then assembly (M5, `src/assemble/`) computes
-ranks/sector-ranks under each feature's rank policy (ADR 0016), the two
-assembly-stage columns (`mohanram_g7`, `conservative_score`, ADR 0013) and
+ranks/sector-ranks under each feature's rank policy (ADR 0016), the
+assembly-stage columns (`mohanram_g7`, `conservative_score`, ADR 0013;
+`magic_formula_score`, ADR 0020) and
 the rank-column quarter-key audit — output layout in dataset.md.
 Market-regime features remain deferred behind their ablation gate
 (PLAN §5.6). Each family writes `data/interim/features/{family}.parquet` on

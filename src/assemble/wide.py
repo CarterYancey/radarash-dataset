@@ -6,10 +6,12 @@ View chain (each a pure-SQL temp view over the previous):
                    shared snapshot key)
     wide_g         + mohanram_g7 from famaindustry medians (decision 0013)
     wide_r1        + {name}_rank / {name}_secrank for every registry feature
-                   whose rank policy is not "none", except conservative_score
-                   (decision 0008 mechanics, decision 0016 policy)
-    wide_r2        + conservative_score from the pass-1 ranks
-    wide_features  + conservative_score_rank
+                   whose rank policy is not "none", except the rank-sum
+                   composites (decision 0008 mechanics, decision 0016 policy)
+    wide_r2        + the rank-sum composites from the pass-1 ranks:
+                   conservative_score (decision 0013), magic_formula_score
+                   (decision 0020)
+    wide_features  + their _rank columns
 
 Rank rule (decision 0008): `percent_rank()` within (calendar quarter,
 snapshot_kind) — plus Sharadar `sector` for the `_secrank` allowlist — over
@@ -39,9 +41,15 @@ RANK_GUARD = 20
 # ADR 0013: minimum non-null famaindustry cross-section per G-score median.
 MIN_INDUSTRY_PEERS = 5
 
-# The conservative-formula composite is built *from* rank columns, so it is
-# ranked in a second pass (ADR 0013).
-CONSERVATIVE = "conservative_score"
+# Rank-sum composites are built *from* pass-1 rank columns, so they are
+# ranked in a second pass: conservative formula (ADR 0013; low vol, high
+# momentum, high net payout) and magic formula (ADR 0020; high EBIT/EV,
+# high return on capital).
+RANK_COMPOSITES: dict[str, str] = {
+    "conservative_score":
+        "(1 - vol_36m_rank) + mom_12_2_rank + net_payout_yield_rank",
+    "magic_formula_score": "ebit_to_ev_rank + roc_greenblatt_rank",
+}
 
 # (feature, industry-median comparison direction) per Mohanram signal that
 # uses a median; the accruals signal (cfo > roa) is firm-level (ADR 0013).
@@ -183,7 +191,7 @@ def build_wide_views(
     rank_selects = [
         f"{_rank_expr(spec, qk, rank_guard)} AS {spec.name}_rank"
         for spec in ranked_features()
-        if spec.name != CONSERVATIVE
+        if spec.name not in RANK_COMPOSITES
     ] + [
         f"CASE WHEN sector IS NOT NULL THEN "
         f"{_rank_expr(spec, qk + ', sector', rank_guard)} END"
@@ -198,22 +206,22 @@ def build_wide_views(
         """
     )
 
-    # -- wide_r2 + wide_features: the conservative formula (ADR 0013) ----
-    con.execute(
-        f"""
-        CREATE OR REPLACE TEMP VIEW wide_r2 AS
-        SELECT *,
-               (1 - vol_36m_rank) + mom_12_2_rank + net_payout_yield_rank
-                   AS {CONSERVATIVE}
-        FROM wide_r1
-        """
+    # -- wide_r2 + wide_features: rank-sum composites (ADR 0013/0020) ----
+    composites = ", ".join(
+        f"{expr} AS {name}" for name, expr in RANK_COMPOSITES.items()
     )
-    conservative = next(s for s in FEATURES if s.name == CONSERVATIVE)
+    con.execute(
+        f"CREATE OR REPLACE TEMP VIEW wide_r2 AS SELECT *, {composites} FROM wide_r1"
+    )
+    specs = {s.name: s for s in FEATURES}
+    composite_ranks = ", ".join(
+        f"{_rank_expr(specs[name], qk, rank_guard)} AS {name}_rank"
+        for name in RANK_COMPOSITES
+    )
     con.execute(
         f"""
         CREATE OR REPLACE TEMP VIEW wide_features AS
-        SELECT *, {_rank_expr(conservative, qk, rank_guard)}
-                      AS {CONSERVATIVE}_rank
+        SELECT *, {composite_ranks}
         FROM wide_r2
         """
     )

@@ -50,15 +50,16 @@ docs/features.md notes):
 |---|---|---|
 | `full` | `_rank` (+ `_secrank` if allowlisted) | the percent rank above; continuous features |
 | `pinned` (mass at raw *v*, rank *r*) | same | rows at exactly *v* rank *r* in every quarter; the rest are percent-ranked within their side of the pin, below onto [0, *r*], above onto [*r*, 1] — the mass's rank is a fixed constant, not the quarter's share below it |
-| `none` | no rank columns | integer-valued composites, counts and shares (`piotroski_f`, `mohanram_g7`, `fundamentals_age_days`, `fund_history_quarters`, `div_*_10y`, `*_up_frac_*`, `ocf_positive_frac_*`) and the bounded `ni_change_scaled` (masses at ±1 on every sign flip): the raw score is already cross-sectionally comparable |
+| `none` | no rank columns | integer-valued composites, counts and shares (`piotroski_f`, `mohanram_g7`, `fundamentals_age_days`, `fund_history_quarters`, `div_*_10y`, `*_up_frac_*`, `ocf_positive_frac_*`, `*_5y_pctile`) and the bounded `ni_change_scaled` (masses at ±1 on every sign flip): the raw score is already cross-sectionally comparable |
 
 Pins in v1.2 (mass at raw 0 unless stated): rank 0 for `dividend_yield`,
 `rnd_to_assets`, `capex_to_assets`, `debt_to_equity`, `sales_yield`,
-`asset_turnover`; rank 0.5 for the signed `net_payout_yield`,
+`asset_turnover` (and, from v1.3, `sales_yield_vs_5y_median`,
+`max_ret_21d`); rank 0.5 for the signed `net_payout_yield`,
 `ext_financing_to_assets`, `share_count_growth_1y`, `gp_to_assets`,
 `asset_turnover_delta_1y`, `gross_margin_delta_1y`, `gross_margin_delta_2y`,
-`ret_1m`; rank 1 for `dist_52w_high` (≤ 0, zero = at
-the 52-week high); mass at raw **1**: `gross_margin` (rank 1 — no cost of
+`ret_1m`; rank 1 for `dist_52w_high` and (v1.3)
+`dist_5y_high` (≤ 0, zero = at the high); mass at raw **1**: `gross_margin` (rank 1 — no cost of
 revenue reported), `gmi` and `ev_to_marketcap` (rank 0.5).
 
 ### Rank audit (ADR 0016)
@@ -83,7 +84,7 @@ The gate is `max_key_share`, not `tie_mass`: fine-grained integer columns
 tie nearly every row without emitting a resolvable constant, while a
 pinned mass is tied in every quarter but never keyed.
 
-### Assembly-stage composites (ADR 0013)
+### Assembly-stage composites (ADR 0013, 0020)
 
 - `mohanram_g7` — sum of seven binary signals against `famaindustry`
   medians within (quarter, kind); medians need `--min-industry-peers`
@@ -94,6 +95,10 @@ pinned mass is tied in every quarter but never keyed.
   [0, 3]; NULL if any input rank is NULL. Sits in the technical family's
   column block and is ranked (`full`); `mohanram_g7` is an integer score and
   is not ranked (ADR 0016).
+- `magic_formula_score` (v1.3, ADR 0020) — `ebit_to_ev_rank +
+  roc_greenblatt_rank`, range [0, 2]; NULL if either rank is NULL. Sits in
+  the valuation family's column block and is ranked (`full`), in the same
+  second rank pass as `conservative_score`.
 
 ### Uniqueness weights (ADR 0012)
 

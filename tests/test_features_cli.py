@@ -375,6 +375,14 @@ def test_acme_solvency(features_world):
     assert zmij == pytest.approx(
         -4.336 - 4.513 * 0.05 + 5.679 * 0.55 + 0.004 * (480 / 220)
     )
+    # Ohlson O (ADR 0020): no dummies set (liabilities < assets, profitable
+    # both years); CHIN = (60 - 40) / (60 + 40) = 0.2.
+    (ohlson,) = acme(features_world, "solvency", "ohlson_o", "2016-04-01")
+    assert ohlson == pytest.approx(
+        -1.32 - 0.407 * math.log(1200 / 1e6) + 6.03 * 0.55 - 1.43 * wc_ta
+        + 0.0757 * (220 / 480) - 2.37 * 0.05 - 1.83 * (90 / 660)
+        - 0.521 * 0.2
+    )
 
 
 def test_acme_quality(features_world):
@@ -398,6 +406,10 @@ def test_acme_quality(features_world):
         (dsri, gmi, aqi, sgi, depi, sgai, lvgi, tata, beneish, 7,
          0.62, -0.005)
     )
+    # The same nine signals as flags (ADR 0020), in Piotroski's order.
+    assert acme(
+        features_world, "quality", PIOTROSKI_FLAGS, "2016-04-01"
+    ) == (True, True, True, True, True, True, False, True, False)
 
     # ADR 0013 G-score inputs: rnd/capex are T0 intensities; the FY2014
     # filing reports neither, so unreported R&D counts as 0 while capex
@@ -415,6 +427,13 @@ def test_acme_quality(features_world):
         "rnd_to_assets, capex_to_assets",
         "2016-01-01",
     ) == (0.0, None)
+
+
+PIOTROSKI_FLAGS = (
+    "piotroski_roa_positive, piotroski_cfo_positive, piotroski_roa_up, "
+    "piotroski_cfo_gt_ni, piotroski_leverage_down, piotroski_liquidity_up, "
+    "piotroski_no_issuance, piotroski_margin_up, piotroski_turnover_up"
+)
 
 
 def neg_row(features_world, family: str, columns: str):
@@ -468,6 +487,13 @@ def test_neg_null_rules(features_world):
     assert neg_row(features_world, "quality", "piotroski_f, beneish_m") == (
         None, None,
     )
+    # Current-filing signals still fire (roa -0.1, cfo -10 > ni -50,
+    # issuance 20 > 0); the four YoY signals are NULL, not False.
+    assert neg_row(features_world, "quality", PIOTROSKI_FLAGS) == (
+        False, False, None, True, None, None, False, None, None,
+    )
+    # O-score inherits the missing working capital (and the lag) -> NULL.
+    assert neg_row(features_world, "solvency", "ohlson_o") == (None,)
 
 
 def grow_row(features_world, columns: str, snapshot_date: str):
