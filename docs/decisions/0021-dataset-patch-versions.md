@@ -68,6 +68,15 @@ interim input. That means someone re-ingested without rerunning
   `provenance.files["dataset.parquet"].sha256` with every result
   (`docs/manual.md` §1), so it can tell whether two runs used the same
   bytes.
+- **A matching hash proves identical data; a different hash doesn't prove
+  different data.** Assembly isn't byte-reproducible. A rebuild of
+  `dataset_v1.4` from the same interim files (as 1.4.1) matched in 386
+  of 390 columns, all split files, and all manifest stats. The four
+  `sample_weight_{H}y` columns differed by up to 2.7e-14 relative
+  (floating-point summation order in the weights' running-sum window,
+  which can depend on DuckDB's threads/memory partitioning), and
+  `rank_audit.parquet`'s `key_*` columns differed (arbitrary `arg_max`
+  tie-break). Making assembly deterministic is an open item in TODO.md.
 - Rebuilding a deleted version still won't reproduce it unless the old
   raw ingest still exists, because ingest overwrites `data/raw/`. The
   manifest now *detects* this but can't *prevent* it. Keeping dated
@@ -76,4 +85,6 @@ interim input. That means someone re-ingested without rerunning
 - Hashing adds a few seconds per build (about 2 GB of output).
 - The `dataset_v1.4` that exists on 2026-11-24 is the rebuild on the
   2026-11-21 snapshot, not the original. Its manifest has no provenance
-  block because it predates this decision.
+  block because it predates this decision. `dataset_v1.4.1` was built
+  from the same interim files, with provenance (commit `6cffa65`), and
+  is equivalent to it up to the noise described above.

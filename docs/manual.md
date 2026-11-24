@@ -36,10 +36,23 @@ Treat a patch as a different dataset when comparing results.
 **Record the fingerprint with every result.** Log
 `manifest["provenance"]["files"]["dataset.parquet"]["sha256"]` with each
 run, next to its seed and config. If a rerun with the same seed gives
-different numbers, compare that hash first: a different hash means
-different data, and `provenance.raw_sources` / `provenance.code` show
-which input changed. Manifests from before decision 0021 have no
-`provenance` block.
+different numbers, compare that hash first:
+
+- **Same hash:** same bytes. The difference is on your side (code,
+  environment, nondeterministic training).
+- **Different hash:** the files differ, but the data may not differ in any
+  meaningful way. Assembly is not byte-reproducible: rebuilding from
+  identical inputs changes the last bits of `sample_weight_{H}y`
+  (relative differences around 1e-14, from floating-point summation
+  order) and the example key in `rank_audit.parquet`. So diff the
+  manifests' `provenance` next. If `raw_sources` and `code` match, the
+  builds came from the same inputs and differ only by that noise. If they
+  don't, they show which input changed.
+
+Even that noise can make a strict seed-for-seed rerun diverge (for
+example, a tree split that lands on a tie), so compare results across
+builds statistically, not bit-for-bit. Manifests from before decision
+0021 have no `provenance` block.
 
 ## 2. The row grain
 

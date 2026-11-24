@@ -167,6 +167,28 @@ Each produces a short writeup in `docs/decisions/`.
       **Within (calendar quarter, snapshot_kind)**, `percent_rank`,
       thin-slice guard 20; sector variant for an allowlist
       → `docs/decisions/0008` *(accepted; research §F7 + §F10)*.
+- [ ] Byte-reproducible assembly? Rebuilding from identical inputs changes
+      `dataset.parquet`'s sha256 (ADR 0021): `sample_weight_{H}y` differs
+      by about 1e-14 relative (double running sum in `assemble/weights.py`
+      whose summation order follows DuckDB's window partitioning), and
+      `rank_audit.parquet`'s `key_*` columns come from an arbitrary
+      `arg_max` tie-break (`assemble/audit.py`). Fix options:
+      - weights: accumulate the integral as exact fixed-point integers
+        (HUGEINT; scale by lcm(1..C) so `seg_days / c` is exact when the
+        overlap count c ≤ C, rounded above that). Order-independent, with
+        added error below 1e-12;
+      - weights, cheaper: round to about 12 significant digits. Simple,
+        but noise that straddles a rounding boundary still flips some rows;
+      - weights: compute each window's integral directly with an ordered
+        aggregate (`sum(x ORDER BY d)`) over its segments. Deterministic
+        but costs a windows × segments range join (hundreds of millions of
+        rows);
+      - audit: break ties deterministically by (share, quarter, value);
+      - pin DuckDB `threads` (and `memory_limit`) during assembly. May be
+        enough on its own, but only holds on the same machine settings;
+      - regression test either way: assemble the test world twice under
+        different thread/memory settings and assert identical sha256s.
+      A rebuild after any of these is a patch version (ADR 0021).
 - [ ] Snapshot frequency: quarterly vs. monthly (monthly triples data volume and
       overlap; quarterly is the default until shown insufficient).
 - [ ] Min/max terminal-price labels: keep, or drop after sensitivity analysis?
