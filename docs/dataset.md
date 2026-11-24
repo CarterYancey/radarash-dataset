@@ -6,12 +6,12 @@ Produced by `sharadar-assemble` (`src/assemble/`), consuming
 **versioned, immutable directory**:
 
 ```
-data/datasets/dataset_vX.Y/
+data/datasets/dataset_vX.Y[.Z]/
 ├── dataset.parquet       one row per snapshot: features × ranks × labels × weights
 ├── splits.parquet        verbatim copy of the split tags (docs/splits.md)
 ├── split_folds.parquet   verbatim copy of the frozen fold manifest
 ├── rank_audit.parquet    quarter-key audit of every rank column (ADR 0016)
-└── manifest.json         provenance: version, params, counts, column layout
+└── manifest.json         version, params, counts, column layout, build provenance
 ```
 
 Design decisions: ranks in [decisions/0008](decisions/0008-rank-representation.md)
@@ -20,6 +20,12 @@ assembly-stage composites in [decisions/0013](decisions/0013-assembly-stage-comp
 uniqueness weights in [decisions/0012](decisions/0012-uniqueness-weights.md).
 An existing version directory is never overwritten (`--force` rebuilds it
 explicitly; otherwise bump `--dataset-version`).
+
+**Versioning ([decisions/0021](decisions/0021-dataset-patch-versions.md)).**
+`X.Y` is a code/schema release (`DEFAULT_VERSION` in `src/assemble/cli.py`);
+`X.Y.Z` is a patch, the same `X.Y` code rebuilt on a newer raw ingest. Each
+label names exactly one build. Pick the version at build time:
+`make all VERSION=1.4.1` (or `sharadar-assemble --dataset-version 1.4.1`).
 
 ## `dataset.parquet` column groups, in order
 
@@ -125,8 +131,9 @@ in the manifest.
 | `rank_audit` | `max_key_share_threshold`, `flagged` (rank column → worst `max_key_share` over kinds, empty on a clean build), `columns` (per rank column: worst `tie_mass`, `keyed_mass`, `max_key_share` over kinds) |
 | `feature_versions` | per-feature `added`/`removed` version from the registry |
 | `input_rows` | row counts of every input parquet at build time |
+| `provenance` | ADR 0021. `raw_sources`: per raw table, `source_data_snapshot_time`, `source_last_refreshed_time`, `zip_sha256`, `rows`, `ingested_at` from `data/raw/<TABLE>.meta.json` (null without one). `code`: `git_commit`, `git_dirty`. `files`: per output file, `sha256` and `bytes` |
 
-Downstream (`value-ml-models`) pins a `dataset_vX.Y`, selects training data
+Downstream (`value-ml-models`) pins a `dataset_vX.Y[.Z]`, selects training data
 via `splits.parquet` roles (`docs/splits.md`), and must cite
 `split_folds.parquet` in reports. Assembly validates every family parquet
 against `src/features/registry.py` before joining and refuses misaligned

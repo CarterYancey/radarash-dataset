@@ -18,6 +18,7 @@ from pathlib import Path
 
 import duckdb
 
+from assemble.provenance import provenance
 from assemble.source import key_meta_columns
 from assemble.wide import (
     feature_columns_in_order,
@@ -63,6 +64,7 @@ def write_inference_dataset(
     inputs: dict[str, Path],
     params: dict[str, int],
     force: bool = False,
+    raw_dir: Path | None = None,
 ) -> Path:
     """Write data/datasets/inference_{as_of}/; return the directory."""
     out_dir = datasets_dir / f"inference_{as_of.isoformat()}"
@@ -122,6 +124,8 @@ def write_inference_dataset(
         },
         "input_rows": input_rows,
     }
+    if raw_dir is not None:
+        manifest["provenance"] = provenance(out_dir, raw_dir)
     (out_dir / "manifest.json").write_text(
         json.dumps(manifest, indent=2) + "\n"
     )

@@ -55,7 +55,7 @@ sharadar-dataset/
 ├── data/
 │   ├── raw/          # bulk parquet exports from Data Link, immutable
 │   ├── interim/      # permaticker-resolved, cleaned tables
-│   └── datasets/     # versioned, immutable datasets: dataset_vX.Y/
+│   └── datasets/     # versioned, immutable datasets: dataset_vX.Y[.Z]/
 ├── src/
 │   ├── ingest/       # bulk download + refresh from Nasdaq Data Link
 │   ├── identity/     # ticker↔permaticker resolution, universe construction
@@ -171,7 +171,7 @@ Definitions: `docs/splits.md`.
 ### 6. Assemble the versioned dataset
 
 ```bash
-make dataset         # or: uv run sharadar-assemble --help
+make dataset         # or: make dataset VERSION=1.4.1; uv run sharadar-assemble --help
 ```
 
 Joins the families × labels on the snapshot key (validated against the
@@ -184,6 +184,9 @@ files + `rank_audit.parquet` + `manifest.json`. The build refuses to publish
 a rank column that identifies the calendar quarter (ADR 0016; the error
 names the column and the registry fix). Column groups: `docs/dataset.md`.
 From an existing ingest, `make all` runs steps 2–6 end-to-end.
+Rebuilding the same code on a newer ingest is a patch version
+(`make all VERSION=1.4.1`, ADR 0021). The manifest's `provenance` block
+records the raw snapshot, git commit, and file hashes of every build.
 
 ### 7. Build the inference dataset (optional)
 

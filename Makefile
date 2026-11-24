@@ -1,5 +1,8 @@
 # Optional subset, e.g.: make ingest TABLES="TICKERS SEP"
 TABLES ?=
+# Dataset version, e.g.: make all VERSION=1.4.1 (decision 0021; default:
+# DEFAULT_VERSION in src/assemble/cli.py)
+VERSION ?=
 
 .PHONY: ingest identity labels features splits dataset inference all qa test
 
@@ -19,13 +22,13 @@ splits:
 	uv run sharadar-splits
 
 dataset:
-	uv run sharadar-assemble
+	uv run sharadar-assemble $(if $(VERSION),--dataset-version $(VERSION))
 
 # Label-free snapshot of today's stocks for a trained model to score
 inference:
 	uv run sharadar-inference
 
-# End-to-end from an existing ingest: data/raw -> data/datasets/dataset_v1.3
+# End-to-end from an existing ingest: data/raw -> data/datasets/dataset_v$(VERSION)
 all: identity labels features splits dataset
 
 qa:

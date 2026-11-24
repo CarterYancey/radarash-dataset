@@ -43,7 +43,9 @@ committed under `docs/research/reports/`. What remains in this repo:
   trusting the data for real decisions;
 - the remaining **open questions** below (microcap floor, snapshot
   frequency, min/max labels, regime features);
-- maintenance: refresh ingests, rebuild, bump the dataset version.
+- maintenance: refresh ingests, rebuild, bump the dataset version (a
+  rebuild of unchanged code on a new ingest is a patch, `make all
+  VERSION=X.Y.Z`, ADR 0021).
 
 Model training moves downstream to `value-ml-models`, guided by the
 dataset user manual **[docs/manual.md](docs/manual.md)** — the registered

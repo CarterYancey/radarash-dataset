@@ -19,13 +19,27 @@ dataset_v1.4/
 ├── splits.parquet        role tags per (scheme, fold, horizon, snapshot)
 ├── split_folds.parquet   frozen fold manifest (boundaries + role counts)
 ├── rank_audit.parquet    per rank column × kind: tie mass, quarter-key share (§3)
-└── manifest.json         provenance: version, params, counts, column layout, rank policy
+└── manifest.json         version, params, counts, column layout, rank policy, build provenance
 ```
 
 Pin the version. Never edit files inside it; if something is wrong or
 missing, file it against `sharadar-dataset` and consume the next version.
 `manifest.json` records everything needed to cite the build: row counts,
 per-horizon effective sample sizes, parameters, and the full column layout.
+
+**Versions are `X.Y[.Z]`** (decision 0021). `X.Y` changes when the code or
+schema changes. A patch `X.Y.Z` is the same code rebuilt on a newer
+Sharadar snapshot, so its column layout matches `X.Y` but its values
+don't (newer prices complete more labels, and Sharadar revises history).
+Treat a patch as a different dataset when comparing results.
+
+**Record the fingerprint with every result.** Log
+`manifest["provenance"]["files"]["dataset.parquet"]["sha256"]` with each
+run, next to its seed and config. If a rerun with the same seed gives
+different numbers, compare that hash first: a different hash means
+different data, and `provenance.raw_sources` / `provenance.code` show
+which input changed. Manifests from before decision 0021 have no
+`provenance` block.
 
 ## 2. The row grain
 

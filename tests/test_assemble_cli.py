@@ -22,6 +22,7 @@ catch (test_rank_audit pins the numbers and the refusal).
 
 from __future__ import annotations
 
+import hashlib
 import json
 from datetime import date, timedelta
 from pathlib import Path
@@ -666,6 +667,62 @@ def test_manifest(assembled_world):
     }
     # Effective sample size: 1y sums every observable row's uniqueness.
     assert 0 < manifest["effective_rows"]["1y"] < 219
+
+
+def test_manifest_provenance(assembled_world):
+    """Decision 0021: raw snapshot, code commit, and file fingerprints."""
+    out = dataset_dir(assembled_world)
+    prov = json.loads((out / "manifest.json").read_text())["provenance"]
+    # Fixture raw tables are written without ingest meta files.
+    assert prov["raw_sources"] == {
+        name: None
+        for name in ("ACTIONS", "SEP", "SF1", "SFP", "TICKERS")
+    }
+    assert set(prov["code"]) == {"git_commit", "git_dirty"}
+    assert set(prov["files"]) == {
+        "dataset.parquet", "rank_audit.parquet",
+        "split_folds.parquet", "splits.parquet",
+    }
+    data = (out / "dataset.parquet").read_bytes()
+    assert prov["files"]["dataset.parquet"] == {
+        "sha256": hashlib.sha256(data).hexdigest(), "bytes": len(data),
+    }
+
+
+def test_patch_version_records_new_raw_snapshot(assembled_world):
+    """A rebuild on a newer ingest is a separate X.Y.Z directory whose
+    manifest names the snapshot; X.Y is left untouched."""
+    raw = assembled_world / "raw"
+    meta_path = raw / "SF1.meta.json"
+    meta_path.write_text(json.dumps({
+        "table": "SHARADAR/SF1", "rows": 42, "zip_sha256": "ab" * 32,
+        "source_data_snapshot_time": "2026-11-21 14:46:26 UTC",
+        "source_last_refreshed_time": "2026-11-21 14:42:00 UTC",
+        "ingested_at": "2026-11-23T00:19:52+00:00",
+    }))
+    base = dataset_dir(assembled_world)
+    before = (base / "manifest.json").read_text()
+    patch = f"{assemble_cli.DEFAULT_VERSION}.1"
+    try:
+        assert assemble_cli.main(
+            ["--data-dir", str(assembled_world), "--dataset-version", patch]
+            + ASSEMBLE_ARGS
+        ) == 0
+    finally:
+        meta_path.unlink()
+    manifest = json.loads(
+        (assembled_world / "datasets" / f"dataset_v{patch}" / "manifest.json")
+        .read_text()
+    )
+    assert manifest["dataset_version"] == patch
+    assert manifest["provenance"]["raw_sources"]["SF1"] == {
+        "source_data_snapshot_time": "2026-11-21 14:46:26 UTC",
+        "source_last_refreshed_time": "2026-11-21 14:42:00 UTC",
+        "zip_sha256": "ab" * 32, "rows": 42,
+        "ingested_at": "2026-11-23T00:19:52+00:00",
+    }
+    assert manifest["provenance"]["raw_sources"]["SEP"] is None
+    assert (base / "manifest.json").read_text() == before
 
 
 def test_dataset_versions_are_immutable(assembled_world):

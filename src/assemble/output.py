@@ -10,7 +10,9 @@ weights NULLed wherever the horizon's label is unobservable (decision
 
 After the parquet is written, the rank columns are audited for calendar-
 quarter keys (decision 0016, `audit.py`); the audit table ships as
-`rank_audit.parquet` and is summarised in the manifest. A failing audit
+`rank_audit.parquet` and is summarised in the manifest. The manifest's
+`provenance` block (decision 0021) records the raw snapshot, git commit,
+and per-file sha256 of the build. A failing audit
 removes the directory and raises, unless the caller allows the keys.
 """
 
@@ -36,6 +38,7 @@ from .audit import (
     rank_key_error,
     write_rank_audit,
 )
+from .provenance import provenance
 from .source import key_meta_columns, label_matrix_columns
 from .wide import (
     feature_columns_in_order,
@@ -102,6 +105,7 @@ def write_dataset(
     max_key_share: float = MAX_KEY_SHARE,
     allow_rank_keys: bool = False,
     audit_keep_dir: Path | None = None,
+    raw_dir: Path | None = None,
 ) -> Path:
     """Write data/datasets/dataset_v{version}/; return the directory.
 
@@ -203,6 +207,8 @@ def write_dataset(
         },
         "input_rows": input_rows,
     }
+    if raw_dir is not None:
+        manifest["provenance"] = provenance(out_dir, raw_dir)
     (out_dir / "manifest.json").write_text(
         json.dumps(manifest, indent=2) + "\n"
     )
