@@ -333,6 +333,9 @@ def test_manifest(inference_world):
         "rank": "pinned", "pin_value": 0.0, "pin_rank": 0.0,
     }
     assert "labels" not in manifest["columns"]
+    # Decision 0021: fixture raw tables carry no ingest meta files.
+    assert manifest["provenance"]["raw_sources"]["SEP"] is None
+    assert set(manifest["provenance"]["files"]) == {"dataset.parquet"}
     assert set(manifest["input_rows"]) == {"SF1", "SEP", "SFP", "mapping", "universe"}
 
 

@@ -29,7 +29,7 @@ make identity           # ticker↔permaticker mapping + universe
 make labels             # snapshots + label matrix
 make features           # per-family feature tables (needs labels)
 make splits             # purged/embargoed split tags (needs labels)
-make dataset            # assemble data/datasets/dataset_v1.0/ (needs labels+features+splits)
+make dataset            # assemble data/datasets/dataset_v<VERSION>/ (needs labels+features+splits); VERSION=1.4.1 for a patch (ADR 0021)
 make inference          # label-free inference dataset at the latest prices (needs identity only)
 make all                # identity → labels → features → splits → dataset
 make qa                 # data-gated QA reports (coverage, staleness, DAILY PIT, splits diagnostics)

@@ -1,7 +1,14 @@
 """CLI: assemble the versioned training dataset (M5).
 
-    sharadar-assemble                       # writes data/datasets/dataset_v1.4/
-    sharadar-assemble --dataset-version 1.4 --rank-guard 20
+    sharadar-assemble                           # writes data/datasets/dataset_v1.4/
+    sharadar-assemble --dataset-version 1.4.1   # same code, newer raw snapshot
+    make dataset VERSION=1.4.1                  # the same via make
+
+Versioning (decision 0021): X.Y changes with the code/schema (bump
+DEFAULT_VERSION alongside the change); a rebuild of the same code on a new
+raw ingest is a patch release X.Y.Z. A version label never names two
+different builds — the manifest's `provenance` block (raw snapshot, git
+commit, file sha256) makes any such collision detectable.
 
 Inputs (produced by `sharadar-labels`, `sharadar-features`, `sharadar-splits`):
 
@@ -32,6 +39,7 @@ from features.registry import FAMILIES
 
 from .audit import MAX_KEY_SHARE
 from .output import build_dataset_view, write_dataset
+from .provenance import raw_newer_than
 from .source import (
     available_horizons,
     create_assembly_source_views,
@@ -60,8 +68,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--dataset-version",
         default=DEFAULT_VERSION,
-        help=f"Version suffix of the output directory "
-        f"data/datasets/dataset_vX.Y (default: {DEFAULT_VERSION})",
+        help="Version suffix of the output directory "
+        "data/datasets/dataset_v<VERSION>: X.Y for a code/schema release, "
+        "X.Y.Z for a rebuild of X.Y on a newer raw ingest (decision 0021; "
+        f"default: {DEFAULT_VERSION})",
     )
     parser.add_argument(
         "--rank-guard",
@@ -136,6 +146,16 @@ def main(argv: list[str] | None = None) -> int:
             logger.error("missing input: %s", line)
         return 2
 
+    raw_dir = args.data_dir / "raw"
+    stale = raw_newer_than(raw_dir, [path for path, _ in inputs.values()])
+    if stale:
+        logger.warning(
+            "raw table(s) %s were re-ingested after the interim inputs were "
+            "built; the manifest's raw_sources will not match the assembled "
+            "data — rerun `make all` first",
+            ", ".join(stale),
+        )
+
     con = duckdb.connect()
     try:
         con.execute("SET preserve_insertion_order = false")
@@ -185,6 +205,7 @@ def main(argv: list[str] | None = None) -> int:
             max_key_share=args.max_key_share,
             allow_rank_keys=args.allow_rank_keys,
             audit_keep_dir=interim_dir / "qa",
+            raw_dir=raw_dir,
         )
     except (FileExistsError, ValueError) as exc:
         logger.error("%s", exc)

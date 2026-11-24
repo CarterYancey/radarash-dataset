@@ -19,13 +19,40 @@ dataset_v1.4/
 ├── splits.parquet        role tags per (scheme, fold, horizon, snapshot)
 ├── split_folds.parquet   frozen fold manifest (boundaries + role counts)
 ├── rank_audit.parquet    per rank column × kind: tie mass, quarter-key share (§3)
-└── manifest.json         provenance: version, params, counts, column layout, rank policy
+└── manifest.json         version, params, counts, column layout, rank policy, build provenance
 ```
 
 Pin the version. Never edit files inside it; if something is wrong or
 missing, file it against `sharadar-dataset` and consume the next version.
 `manifest.json` records everything needed to cite the build: row counts,
 per-horizon effective sample sizes, parameters, and the full column layout.
+
+**Versions are `X.Y[.Z]`** (decision 0021). `X.Y` changes when the code or
+schema changes. A patch `X.Y.Z` is the same code rebuilt on a newer
+Sharadar snapshot, so its column layout matches `X.Y` but its values
+don't (newer prices complete more labels, and Sharadar revises history).
+Treat a patch as a different dataset when comparing results.
+
+**Record the fingerprint with every result.** Log
+`manifest["provenance"]["files"]["dataset.parquet"]["sha256"]` with each
+run, next to its seed and config. If a rerun with the same seed gives
+different numbers, compare that hash first:
+
+- **Same hash:** same bytes. The difference is on your side (code,
+  environment, nondeterministic training).
+- **Different hash:** the files differ, but the data may not differ in any
+  meaningful way. Assembly is not byte-reproducible: rebuilding from
+  identical inputs changes the last bits of `sample_weight_{H}y`
+  (relative differences around 1e-14, from floating-point summation
+  order) and the example key in `rank_audit.parquet`. So diff the
+  manifests' `provenance` next. If `raw_sources` and `code` match, the
+  builds came from the same inputs and differ only by that noise. If they
+  don't, they show which input changed.
+
+Even that noise can make a strict seed-for-seed rerun diverge (for
+example, a tree split that lands on a tie), so compare results across
+builds statistically, not bit-for-bit. Manifests from before decision
+0021 have no `provenance` block.
 
 ## 2. The row grain
 

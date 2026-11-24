@@ -209,6 +209,7 @@ def main(argv: list[str] | None = None) -> int:
                 "min_industry_peers": args.min_industry_peers,
             },
             force=args.force,
+            raw_dir=raw_dir,
         )
     except (FileExistsError, ValueError) as exc:
         logger.error("%s", exc)
