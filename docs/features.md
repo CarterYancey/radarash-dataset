@@ -299,14 +299,14 @@ T0 filing ⇒ all NULL. Nominal throughout (no inflation adjustment).
 | `earnings_yield_5y_peak` | T5 | `max(TTM netinc over the 20q history) / marketcap` | yield if earnings return to their 5y best; ≤ 0 ⇒ never profitable in-window |
 | `earnings_yield_at_5y_median_margin` | T5 | `median(netinc / revenue over the 20q history) × revenue / marketcap` | earnings power at the usual margin on today's sales |
 | `earnings_yield_10y_avg` | T10 | `mean(TTM netinc at fiscal-year offsets 0…9) / marketcap` | Graham/Shiller form, nominal; ≥ 6 known years |
-| `revenue_vs_5y_peak` | T5 | `revenue / max(revenue over the 20q history) − 1` | ≤ 0; NULL if the max ≤ 0; pinned rank (1) — at its own peak sits at the top |
+| `revenue_vs_5y_peak` | T5 | `revenue / max(revenue over the 20q history) − 1` | ≤ 0; NULL if the max ≤ 0; not ranked — two masses, 0 (at its own peak) and −1 (revenue gone to zero), on a fixed [−1, 0] scale |
 | `revenue_quarters_since_5y_peak` | T5 | quarters since revenue last stood at that max | 0 = at the peak now; not ranked (count) |
 | `netinc_vs_5y_peak` | T5 | `netinc / max(netinc over the 20q history) − 1` | below −1 on a current loss; NULL if the max ≤ 0; pinned rank (1) |
 | `netinc_quarters_since_5y_peak` | T5 | quarters since TTM netinc last stood at that max | not ranked (count) |
 | `bvps_vs_5y_peak` | T5 | `bvps / max(bvps over the 20q history) − 1` | NULL if the max ≤ 0; pinned rank (1) |
 | `bvps_quarters_since_5y_peak` | T5 | quarters since bvps last stood at that max | not ranked (count) |
 | `netinc_sue_8q` | T3 | `Δ₀ / stddev(Δ₁…Δ₈)`, `Δ_q` = adjacent-quarter change in TTM netinc | Δ equals the quarter minus the same quarter a year before (seasonal-random-walk SUE); ≥ 6 of the 8 prior changes; NULL if stddev = 0 |
-| `revenue_sue_8q` | T3 | same on TTM revenue | |
+| `revenue_sue_8q` | T3 | same on TTM revenue | pinned rank (0.5) — signed, TTM revenue unchanged at 0.5 |
 | `ni_positive_years_10y` | T10 | fiscal years with TTM `netinc > 0`, last 10 | Graham earnings-stability record; not ranked (count) |
 | `ni_history_years_10y` | T10 | annual netinc observations known, last 10 | denominator context; not ranked (count) |
 | `revenue_cagr_10y` | T10 | `(revenue / revenue₋₁₀)^(1/10) − 1` | NULL if `revenue₋₁₀ ≤ 0` |

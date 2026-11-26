@@ -128,6 +128,8 @@ def test_rank_policy_adr_0016():
         "fundamentals_age_days", "piotroski_f", "mohanram_g7",
         "fund_history_quarters", "div_years_paid_10y", "div_streak_10y",
         "div_cuts_10y", "div_history_years_10y", "ni_change_scaled",
+        # two masses (0 at the peak, -1 at zero revenue) — first real audit
+        "revenue_vs_5y_peak",
     } | {
         f"{series}_up_frac_{w}q"
         for series in ("revenue", "tangibles", "ocf", "bvps", "shares")
@@ -166,8 +168,9 @@ def test_rank_policy_adr_0016():
         # gross-margin masses carried into its 5y median / dispersion
         "shares_trend_4q": (0.0, 0.5), "shares_trend_8q": (0.0, 0.5),
         "shares_trend_12q": (0.0, 0.5), "shares_trend_20q": (0.0, 0.5),
-        "revenue_vs_5y_peak": (0.0, 1.0), "netinc_vs_5y_peak": (0.0, 1.0),
-        "bvps_vs_5y_peak": (0.0, 1.0),
+        "netinc_vs_5y_peak": (0.0, 1.0), "bvps_vs_5y_peak": (0.0, 1.0),
+        # first real v1.5 audit: TTM revenue unchanged quarter on quarter
+        "revenue_sue_8q": (0.0, 0.5),
         "gross_margin_5y_median": (1.0, 1.0),
         "gross_margin_5y_std": (0.0, 0.0),
     }

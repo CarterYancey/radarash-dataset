@@ -79,6 +79,15 @@ count); `gross_margin_5y_median` at 1 → 1 and `gross_margin_5y_std` at
 a full percent rank. `shares` ships no consistency column: a constant
 share count makes r² a mass at exactly 1.
 
+*Amended 2026-11-26, first real-data audit run (build 1.5.1):* two columns
+were flagged and re-declared. `revenue_vs_5y_peak` is **unranked**: besides
+the mass at 0 it has a second one at exactly −1 (revenue gone to zero,
+3.2% of `high` 2026-Q2), and two masses cannot be pinned (decision 0016,
+as `ni_change_scaled`); the raw value already lives on a fixed [−1, 0]
+scale. `revenue_sue_8q` is **pinned at 0 → 0.5**: TTM revenue unchanged
+quarter on quarter (2.5% of `high` 2025-Q3), a signed support.
+`netinc_vs_5y_peak` and `bvps_vs_5y_peak` passed and keep their pin.
+
 ## Consequences
 
 - 55 new feature columns (31 `fundhist`, 24 trend) plus their ranks.
