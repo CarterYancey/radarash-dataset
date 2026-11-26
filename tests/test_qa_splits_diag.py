@@ -160,6 +160,7 @@ def diag_world(tmp_path_factory) -> Path:
         ("SEP", build_sep_csv()),
         ("SFP", build_sfp_csv()),
         ("ACTIONS", ACTIONS_CSV),
+        ("EVENTS", 'date,ticker,eventcodes\n2015-01-02,SPIKE,22\n2016-05-10,FLAT,"22,52"\n'),
     ):
         csv_path = data_dir / f"{name}_fixture.csv"
         csv_path.write_text(csv_text)

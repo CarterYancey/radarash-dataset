@@ -35,11 +35,11 @@ resolved questions get an ADR in `docs/decisions/` and are checked off here.
 
 ## Current state & next
 
-All five milestones' code is shipped and `dataset_v1.2` builds end-to-end
+All five milestones' code is shipped and `dataset_v1.5` builds end-to-end
 from a raw ingest (`make all`); the 2026-07-18 real-data QA reports are
 committed under `docs/research/reports/`. What remains in this repo:
 
-- the **verification writeups** V1–V6 below (V7 done) — do these before
+- the **verification writeups** V1–V6 and V8 below (V7 done) — do these before
   trusting the data for real decisions;
 - the remaining **open questions** below (microcap floor, snapshot
   frequency, min/max labels, regime features);
@@ -62,13 +62,48 @@ era-identifiability probe) live on its task list, not here.
       quarter segments; thresholds derived downstream, not stored)
       → `docs/decisions/0017`; appear in the next labels build/dataset
       version.
+- [x] **M3 — Labels.** Full-path labels per horizon: `fwd_{H}_max_runup`,
+      `fwd_{H}_days_to_{max,min}`, `fwd_{H}_path_avg_return`,
+      `fwd_{H}_realized_vol`, and the benchmark's `fwd_{H}_spy_*` path
+      columns (same quarter segments, widened) → `docs/decisions/0022`;
+      dataset version 1.5.
+- [x] **M4 — Features.** Fundamental-history family `fundhist` (own-norm
+      profitability, normalized earnings power, distance from the own
+      peak, seasonal SUE, ten-year record) and trend-family additions
+      (book value per share, share count, loss history)
+      → `docs/decisions/0023`; dataset version 1.5.
+- [x] **M4 — Features.** Corporate-events family `events`: trailing-year
+      8-K item counts from EVENTS (now a features/inference input)
+      → `docs/decisions/0024`; dataset version 1.5. *Remaining: V8 below.*
+- [ ] **First real v1.5 build.** Nothing in 0022–0024 has run on real
+      data. Check: the quarter-key audit on the new rank columns (a
+      flagged column means "declare its policy", ADR 0023); null rates of
+      the 5y/10y columns via `sharadar-qa coverage`; build time; the
+      `fwd_{H}_max_runup` tail on sub-5-cent paths. Checklist and the
+      ideas not shipped (insider/institutional data, triple-barrier, …):
+      `docs/research/feature-expansion.md`.
+- [ ] **Assembly temp-space with the v1.5 column set.** On a synthetic
+      world of 612k snapshots (about 40% of real row count) in a 14 GB /
+      18 GB-free-disk sandbox, `sharadar-assemble` v1.4 completed in
+      10m45s under `--memory-limit 8GB`, while v1.5 failed in the wide
+      rank pass (`write_dataset` COPY) after filling 16 GiB of DuckDB
+      temp space. The rank pass is one query with a differently-ordered
+      window per rank column, so its spill grows with the ~60 added rank
+      columns. Confirm the real build has the temp disk for it; if not,
+      rank in column batches joined back on the key (output unchanged),
+      or drop ranks from columns that do not need them.
+- [ ] **Registry `added_in_version` drift.** The v1.4 features (relvalue,
+      long-window technicals, standard scores) still say `"1.3"` in
+      `src/features/registry.py` while docs/features.md says v1.4, so
+      manifests report `"added": "1.3"` for them.
 - [ ] **Training-outcomes improvement backlog** — prioritized review in
       `docs/research/dataset-improvements.md` (2026-08-27): top items are
       the V1/V6/V4 verifications, a valuation-vs-own-history feature
       family (done → ADR 0018), path-dependent labels (max drawdown + interim low
       done → ADR 0017; triple-barrier still deferred), Ohlson O-score + magic-formula composite
-      + F-score component flags (done → ADR 0020), and trend-family extensions (share count,
-      margins). Each graduates via its own ADR.
+      + F-score component flags (done → ADR 0020), and trend-family extensions (share count
+      and book value per share done → ADR 0023; margins covered there by
+      the 5y median/z columns). Each graduates via its own ADR.
 - [x] **M4 — Features.** Relative-value family: the six marketcap
       yields (earnings/ocf/fcf/sales yield, book and tangible book to
       market) vs. the stock's own 20-quarter history
@@ -139,6 +174,14 @@ Each produces a short writeup in `docs/decisions/`.
       it to <0.1% median error. Writeup + decision (self-built canonical,
       DAILY cross-check only): `docs/decisions/0007` *(accepted)*; results
       in research §F12.
+
+- [ ] **V8 — EVENTS coverage and vocabulary.** Before trusting the
+      `events_*_12m` columns (decision 0024): confirm the `eventcodes`
+      legend (8-K item X.0Y → code XY), and tabulate each column's
+      non-zero rate by year and by alive/delisted. Known risks: the 8-K
+      item scheme began 2004-08-23 (structural zeros before it), and
+      thinner coverage of delisted companies. Outcome: keep as is, or add
+      a per-code coverage floor.
 
 ## Open questions (decide → ADR in docs/decisions/ → check off)
 

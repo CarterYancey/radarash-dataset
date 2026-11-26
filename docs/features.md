@@ -11,7 +11,9 @@
 [0016](decisions/0016-rank-quarter-keys.md) (per-feature rank policy, v1.2),
 [0018](decisions/0018-relative-value-features.md) (relative value, v1.4),
 [0019](decisions/0019-long-window-price-features.md) (long-window price features, v1.4),
-[0020](decisions/0020-standard-scores.md) (O-score, magic formula, F-score flags, v1.4).
+[0020](decisions/0020-standard-scores.md) (O-score, magic formula, F-score flags, v1.4),
+[0023](decisions/0023-fundamental-history-features.md) (fundamental history, v1.5),
+[0024](decisions/0024-corporate-events-features.md) (corporate events, v1.5).
 `src/features/` implements this registry in the build order below.
 Research trail: [research/features.md](research/features.md).
 
@@ -61,8 +63,9 @@ versions diffable from the registry alone.
   refuses a build that carries one (dataset.md).
 - **Tiers** (ADR 0004): T0 current filing; T1/T2/T3 = +1/2/3 fiscal years;
   P12/P36/P60 = 252/756/1260 trading days of `SEP.closeadj` (P60: ADR 0019);
-  T5/T10 = +20 quarters / +10 fiscal years (ADR 0015). Tier = what the feature *needs*; unmet ⇒
-  NULL — except the windowed trend family, whose tier states the full
+  T5/T10 = +20 quarters / +10 fiscal years (ADR 0015, 0023); E12 = 365
+  days of EVENTS coverage (ADR 0024). Tier = what the feature *needs*;
+  unmet ⇒ NULL — except the windowed trend family, whose tier states the full
   window while partial histories degrade per its min-count rules.
 - **Quarterly/annual history windows** (ADR 0015): the lag-q (lag-y)
   observation is the filing with `reportperiod` within ±30 days of
@@ -143,7 +146,9 @@ textbook ROA).
 
 Long-history financial health over quarterly windows w ∈ {4, 8, 12, 20}
 (~1/2/3/5y, matching the label horizons; tiers T1/T2/T3/T5 respectively).
-Series: `revenue` (ART TTM), `tangibles_q` (ARQ), `ncfo` (ART TTM).
+Series: `revenue` (ART TTM), `tangibles_q` (ARQ), `ncfo` (ART TTM), and
+from v1.5 (ADR 0023) book value per share `equity_q / shares` and the share
+count `shares = sharesbas × sharefactor` (both ARQ).
 `trend`/`consistency` need ≥ {3, 5, 7, 11} observations, all > 0 (the log's
 domain — no silent filtering); `up_frac` needs one fewer adjacent-quarter
 pairs; `*_positive_frac` the same min counts. TTM at quarterly spacing
@@ -192,10 +197,34 @@ dividend year ⇒ the dividend counters are NULL.
 | `ocf_trend_20q` | T5 | same fit over 20 quarters | |
 | `ocf_consistency_20q` | T5 | `regr_r2`, 20q | |
 | `ocf_up_frac_20q` | T5 | share of increases, 20q | not ranked (w+1 values) |
+| `bvps_trend_4q` | T1 | `regr_slope(ln(equity_q / shares), years)`, last 4 quarterly obs | book value per share: compounding net of issuance; NULL when book ≤ 0 in-window; added v1.5 |
+| `bvps_consistency_4q` | T1 | `regr_r2` of the 4q bvps fit | added v1.5 |
+| `bvps_up_frac_4q` | T1 | share of adjacent-quarter bvps increases, 4q | not ranked (w+1 values); added v1.5 |
+| `bvps_trend_8q` | T2 | same fit over 8 quarters | added v1.5 |
+| `bvps_consistency_8q` | T2 | `regr_r2`, 8q | added v1.5 |
+| `bvps_up_frac_8q` | T2 | share of increases, 8q | not ranked (w+1 values); added v1.5 |
+| `bvps_trend_12q` | T3 | same fit over 12 quarters | added v1.5 |
+| `bvps_consistency_12q` | T3 | `regr_r2`, 12q | added v1.5 |
+| `bvps_up_frac_12q` | T3 | share of increases, 12q | not ranked (w+1 values); added v1.5 |
+| `bvps_trend_20q` | T5 | same fit over 20 quarters | added v1.5 |
+| `bvps_consistency_20q` | T5 | `regr_r2`, 20q | added v1.5 |
+| `bvps_up_frac_20q` | T5 | share of increases, 20q | not ranked (w+1 values); added v1.5 |
+| `shares_trend_4q` | T1 | `regr_slope(ln(sharesbas·sharefactor), years)`, last 4 quarterly obs | dilution (+) / buyback (−) rate; no consistency column (a constant count degenerates r² to a mass at 1); pinned rank (0.5) — unchanged share count at 0.5; added v1.5 |
+| `shares_up_frac_4q` | T1 | share of adjacent-quarter share-count increases, 4q | serial-issuer marker; not ranked (w+1 values); added v1.5 |
+| `shares_trend_8q` | T2 | same fit over 8 quarters | pinned rank (0.5) — unchanged share count at 0.5; added v1.5 |
+| `shares_up_frac_8q` | T2 | share of increases, 8q | serial-issuer marker; not ranked (w+1 values); added v1.5 |
+| `shares_trend_12q` | T3 | same fit over 12 quarters | pinned rank (0.5) — unchanged share count at 0.5; added v1.5 |
+| `shares_up_frac_12q` | T3 | share of increases, 12q | serial-issuer marker; not ranked (w+1 values); added v1.5 |
+| `shares_trend_20q` | T5 | same fit over 20 quarters | pinned rank (0.5) — unchanged share count at 0.5; added v1.5 |
+| `shares_up_frac_20q` | T5 | share of increases, 20q | serial-issuer marker; not ranked (w+1 values); added v1.5 |
 | `ocf_positive_frac_4q` | T1 | share of last 4 quarterly obs with `ncfo > 0` | the OCF-sign signal where log trend is NULL; not ranked (w+1 values) |
 | `ocf_positive_frac_8q` | T2 | same, 8q | not ranked (w+1 values) |
 | `ocf_positive_frac_12q` | T3 | same, 12q | not ranked (w+1 values) |
 | `ocf_positive_frac_20q` | T5 | same, 20q | not ranked (w+1 values) |
+| `ni_positive_frac_4q` | T1 | share of last 4 quarterly obs with TTM `netinc > 0` | loss history; not ranked (w+1 values); added v1.5 |
+| `ni_positive_frac_8q` | T2 | same, 8q | loss history; not ranked (w+1 values); added v1.5 |
+| `ni_positive_frac_12q` | T3 | same, 12q | loss history; not ranked (w+1 values); added v1.5 |
+| `ni_positive_frac_20q` | T5 | same, 20q | loss history; not ranked (w+1 values); added v1.5 |
 | `fund_history_quarters` | T5 | quarterly filings present in the 20q window | short history *is* the signal; not ranked (count) |
 | `div_years_paid_10y` | T10 | fiscal years with `−ncfdiv > 0`, last 10 | not ranked (count) |
 | `div_streak_10y` | T10 | consecutive paying years ending now, max 10 | missing/unknown year breaks it; not ranked (count) |
@@ -236,6 +265,53 @@ floor, where the absence of a history is itself the signal.
 | `book_to_market_5y_pctile` | T5 | same midrank percentile over historical `book_to_market` | not ranked (share) |
 | `tangible_book_to_market_vs_5y_median` | T5 | `tangible_book_to_market / median(historical tangible_book_to_market)` | NULL if the median ≤ 0; negative current tangible book kept (below 0) |
 | `tangible_book_to_market_5y_pctile` | T5 | same midrank percentile over historical `tangible_book_to_market` | not ranked (share) |
+
+## Fundamental history (ADR 0023; added in v1.5)
+
+Today's fundamentals against the stock's **own record** — "is this number
+normal for this company?". Same point-in-time buckets as the two families
+above: the 20q `fund_history` window (each bucket's ratio recomputed from
+that bucket's own filing, same null rules as the level features) and an
+annual window of fiscal-year offsets 0…10. `current` is the T0 filing
+(bucket 0). 5y statistics need ≥ 11 of the 20 quarterly observations
+(ADR 0015's 20q rule); the ten-year averages need ≥ 6 known fiscal years;
+`*_cagr_10y` needs the observation exactly ten fiscal years back. The
+yields divide by **today's** `marketcap`. `bvps = equity_q / shares`. No
+T0 filing ⇒ all NULL. Nominal throughout (no inflation adjustment).
+
+| column | tier | definition | notes |
+|---|---|---|---|
+| `roa_5y_median` | T5 | median of `netinc / assets_q` over the 20q history | the stock's normal ROA |
+| `roa_5y_std` | T5 | sample stddev of the same 20q values | stability of profitability |
+| `roa_5y_z` | T5 | `(current − mean) / stddev` of the same values | how unusual today is in the stock's own units; NULL if stddev = 0 |
+| `roe_5y_median` | T5 | median of `netinc / equity_q` over the 20q history | buckets with `equity_q ≤ 0` are NULL |
+| `roe_5y_std` | T5 | sample stddev of the same 20q values | |
+| `roe_5y_z` | T5 | `(current − mean) / stddev` of the same values | NULL if stddev = 0 |
+| `gross_margin_5y_median` | T5 | median of `gp / revenue` over the 20q history | pinned rank (1 at raw 1) — no cost of revenue reported, as `gross_margin` |
+| `gross_margin_5y_std` | T5 | sample stddev of the same 20q values | pinned rank (0) — a constant margin |
+| `gross_margin_5y_z` | T5 | `(current − mean) / stddev` of the same values | NULL if stddev = 0 |
+| `operating_margin_5y_median` | T5 | median of `ebit / revenue` over the 20q history | |
+| `operating_margin_5y_std` | T5 | sample stddev of the same 20q values | |
+| `operating_margin_5y_z` | T5 | `(current − mean) / stddev` of the same values | NULL if stddev = 0 |
+| `earnings_yield_5y_avg` | T5 | `mean(TTM netinc over the 20q history) / marketcap` | price paid for average, not latest, earnings |
+| `ocf_yield_5y_avg` | T5 | `mean(TTM ncfo over the 20q history) / marketcap` | |
+| `fcf_yield_5y_avg` | T5 | `mean(TTM fcf over the 20q history) / marketcap` | |
+| `earnings_yield_5y_peak` | T5 | `max(TTM netinc over the 20q history) / marketcap` | yield if earnings return to their 5y best; ≤ 0 ⇒ never profitable in-window |
+| `earnings_yield_at_5y_median_margin` | T5 | `median(netinc / revenue over the 20q history) × revenue / marketcap` | earnings power at the usual margin on today's sales |
+| `earnings_yield_10y_avg` | T10 | `mean(TTM netinc at fiscal-year offsets 0…9) / marketcap` | Graham/Shiller form, nominal; ≥ 6 known years |
+| `revenue_vs_5y_peak` | T5 | `revenue / max(revenue over the 20q history) − 1` | ≤ 0; NULL if the max ≤ 0; pinned rank (1) — at its own peak sits at the top |
+| `revenue_quarters_since_5y_peak` | T5 | quarters since revenue last stood at that max | 0 = at the peak now; not ranked (count) |
+| `netinc_vs_5y_peak` | T5 | `netinc / max(netinc over the 20q history) − 1` | below −1 on a current loss; NULL if the max ≤ 0; pinned rank (1) |
+| `netinc_quarters_since_5y_peak` | T5 | quarters since TTM netinc last stood at that max | not ranked (count) |
+| `bvps_vs_5y_peak` | T5 | `bvps / max(bvps over the 20q history) − 1` | NULL if the max ≤ 0; pinned rank (1) |
+| `bvps_quarters_since_5y_peak` | T5 | quarters since bvps last stood at that max | not ranked (count) |
+| `netinc_sue_8q` | T3 | `Δ₀ / stddev(Δ₁…Δ₈)`, `Δ_q` = adjacent-quarter change in TTM netinc | Δ equals the quarter minus the same quarter a year before (seasonal-random-walk SUE); ≥ 6 of the 8 prior changes; NULL if stddev = 0 |
+| `revenue_sue_8q` | T3 | same on TTM revenue | |
+| `ni_positive_years_10y` | T10 | fiscal years with TTM `netinc > 0`, last 10 | Graham earnings-stability record; not ranked (count) |
+| `ni_history_years_10y` | T10 | annual netinc observations known, last 10 | denominator context; not ranked (count) |
+| `revenue_cagr_10y` | T10 | `(revenue / revenue₋₁₀)^(1/10) − 1` | NULL if `revenue₋₁₀ ≤ 0` |
+| `bvps_cagr_10y` | T10 | `(bvps / bvps₋₁₀)^(1/10) − 1` | NULL unless both > 0 |
+| `shares_cagr_10y` | T10 | `(shares / shares₋₁₀)^(1/10) − 1` | ten-year dilution rate |
 
 ## Solvency / distress
 
@@ -317,6 +393,35 @@ Composites are NULL when any component is NULL (⌂⌐ inherited).
 | `amihud_12m` | P12 | mean `|ret| / (close × volume)` | illiquidity |
 | `conservative_score` | P36 | rank-sum of `vol_36m` (low), `mom_12_2` (high), `net_payout_yield` (high) | **assembly-stage** composite (needs ranks) |
 
+## Corporate events (ADR 0024; added in v1.5)
+
+8-K item counts from Sharadar `EVENTS` (item X.0Y → code XY) — the only
+family not derived from SF1 or prices: what management had to announce
+*between* the accounts. Each column counts the distinct event dates
+carrying the code in `snapshot_date − 365 ≤ date < snapshot_date`
+(strictly before, as fundamentals; `≤` at inference, ADR 0014). Tickers
+resolve to permatickers by the SF1 rule. **NULL** when the window reaches
+back before the first date in the EVENTS export (no coverage ⇒ unknown);
+inside coverage a stock with no matching row is **0**. Tier E12 = 365 days
+of EVENTS coverage.
+
+| column | tier | definition | notes |
+|---|---|---|---|
+| `events_8k_days_12m` | E12 | distinct EVENTS dates in the window | 8-K filing activity; 0 for a company that files none (the context for the zeros below); not ranked (count) |
+| `events_earnings_release_12m` | E12 | event dates carrying code 22 (item 2.02 results of operations) | about 4 a year is normal; fewer marks a late or irregular reporter; not ranked (count) |
+| `events_bankruptcy_12m` | E12 | event dates carrying code 13 (item 1.03 bankruptcy or receivership) | not ranked (count) |
+| `events_acquisition_12m` | E12 | event dates carrying code 21 (item 2.01 completed acquisition or disposition) | not ranked (count) |
+| `events_new_obligation_12m` | E12 | event dates carrying code 23 (item 2.03 new direct financial obligation) | new debt; not ranked (count) |
+| `events_obligation_trigger_12m` | E12 | event dates carrying code 24 (item 2.04 obligation acceleration trigger) | covenant default / acceleration; not ranked (count) |
+| `events_exit_costs_12m` | E12 | event dates carrying code 25 (item 2.05 exit or disposal costs) | restructuring; not ranked (count) |
+| `events_impairment_12m` | E12 | event dates carrying code 26 (item 2.06 material impairment) | not ranked (count) |
+| `events_delisting_notice_12m` | E12 | event dates carrying code 31 (item 3.01 delisting notice / listing-rule failure) | not ranked (count) |
+| `events_unregistered_sales_12m` | E12 | event dates carrying code 32 (item 3.02 unregistered equity sales) | PIPEs and other private placements — dilutive financing; not ranked (count) |
+| `events_auditor_change_12m` | E12 | event dates carrying code 41 (item 4.01 auditor change) | not ranked (count) |
+| `events_non_reliance_12m` | E12 | event dates carrying code 42 (item 4.02 non-reliance on issued financials) | restatement; not ranked (count) |
+| `events_control_change_12m` | E12 | event dates carrying code 51 (item 5.01 change in control) | not ranked (count) |
+| `events_officer_change_12m` | E12 | event dates carrying code 52 (item 5.02 officer / director change) | the commonest item; heavy turnover is the signal; not ranked (count) |
+
 ## Classification (not ranked)
 
 | column | source | notes |
@@ -340,8 +445,8 @@ diff once two ingest vintages exist.
 
 `base` (as-of + lag resolution), `history` (quarterly/annual buckets,
 ADR 0015) and `market` (marketcap/EV) → `valuation` →
-`profitability` + `growth` → `trend` → `relvalue` → `solvency` → `quality` →
-`technical` → `classification`; then assembly (M5, `src/assemble/`) computes
+`profitability` + `growth` → `trend` → `relvalue` → `fundhist` → `solvency` → `quality` →
+`technical` → `events` → `classification`; then assembly (M5, `src/assemble/`) computes
 ranks/sector-ranks under each feature's rank policy (ADR 0016), the
 assembly-stage columns (`mohanram_g7`, `conservative_score`, ADR 0013;
 `magic_formula_score`, ADR 0020) and

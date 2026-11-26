@@ -165,6 +165,7 @@ def inference_world(tmp_path_factory) -> Path:
         ("SF1", build_sf1_csv()),
         ("SEP", build_sep_csv()),
         ("SFP", build_sfp_csv()),
+        ("EVENTS", EVENTS_CSV),
     ):
         csv_path = data_dir / f"{name}_fixture.csv"
         csv_path.write_text(csv_text)
@@ -175,6 +176,15 @@ def inference_world(tmp_path_factory) -> Path:
         ["--data-dir", str(data_dir)] + GUARD_ARGS
     ) == 0
     return data_dir
+
+
+# MONE files a non-reliance 8-K on the as-of date itself (usable at
+# inference, ADR 0014); MTWO's 2013 row opens the export's coverage.
+EVENTS_CSV = """\
+date,ticker,eventcodes
+2013-01-02,MTWO,22
+2018-12-31,MONE,42
+"""
 
 
 def dataset_path(data_dir: Path, as_of: str = "2018-12-31") -> Path:
@@ -253,6 +263,17 @@ def test_same_day_filing_is_used(inference_world):
         (500002, date(2016, 12, 31), (MTWO_LAST - date(2017, 3, 1)).days, False),
         (500003, date(2016, 12, 31), (END - date(2017, 3, 1)).days, False),
     ]
+
+
+def test_same_day_event_is_used(inference_world):
+    rows = query(
+        inference_world,
+        """
+        SELECT permaticker, events_non_reliance_12m, events_8k_days_12m
+        FROM {t} WHERE permaticker IN (500001, 500002) ORDER BY permaticker
+        """,
+    )
+    assert rows == [(500001, 1, 1), (500002, 0, 0)]
 
 
 def test_ranks_over_the_inference_cross_section(inference_world):
@@ -336,7 +357,9 @@ def test_manifest(inference_world):
     # Decision 0021: fixture raw tables carry no ingest meta files.
     assert manifest["provenance"]["raw_sources"]["SEP"] is None
     assert set(manifest["provenance"]["files"]) == {"dataset.parquet"}
-    assert set(manifest["input_rows"]) == {"SF1", "SEP", "SFP", "mapping", "universe"}
+    assert set(manifest["input_rows"]) == {
+        "SF1", "SEP", "SFP", "EVENTS", "mapping", "universe",
+    }
 
 
 def test_as_of_in_the_past(inference_world):

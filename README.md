@@ -85,7 +85,7 @@ sharadar-dataset/
 | M4 — Features | ✅ done (V5 bank/insurer half pending) |
 | M5 — Splits & assembly | ✅ done — `dataset_v1.0` built end-to-end, QA reports published |
 
-The pipeline is complete: `make all` produces `dataset_v1.4` from a raw
+The pipeline is complete: `make all` produces `dataset_v1.5` from a raw
 ingest, and the QA reports from the real-data run are committed under
 [docs/research/reports/](docs/research/reports/). Remaining work is the
 verification writeups and open questions in **[TODO.md](TODO.md)**;
@@ -171,7 +171,7 @@ Definitions: `docs/splits.md`.
 ### 6. Assemble the versioned dataset
 
 ```bash
-make dataset         # or: make dataset VERSION=1.4.1; uv run sharadar-assemble --help
+make dataset         # or: make dataset VERSION=1.5.1; uv run sharadar-assemble --help
 ```
 
 Joins the families × labels on the snapshot key (validated against the
@@ -179,13 +179,13 @@ registry), computes the registry-driven ranks/sector-ranks under each
 feature's rank policy (ADR 0008, 0016), the assembly-stage composites
 `mohanram_g7` and `conservative_score` (ADR 0013), and the per-horizon
 uniqueness weights `sample_weight_{H}y` (ADR 0012), then writes the
-immutable `data/datasets/dataset_v1.4/` — `dataset.parquet` + the split
+immutable `data/datasets/dataset_v1.5/` — `dataset.parquet` + the split
 files + `rank_audit.parquet` + `manifest.json`. The build refuses to publish
 a rank column that identifies the calendar quarter (ADR 0016; the error
 names the column and the registry fix). Column groups: `docs/dataset.md`.
 From an existing ingest, `make all` runs steps 2–6 end-to-end.
 Rebuilding the same code on a newer ingest is a patch version
-(`make all VERSION=1.4.1`, ADR 0021). The manifest's `provenance` block
+(`make all VERSION=1.5.1`, ADR 0021). The manifest's `provenance` block
 records the raw snapshot, git commit, and file hashes of every build.
 
 ### 7. Build the inference dataset (optional)

@@ -24,9 +24,11 @@ SECTION_FAMILIES = {
     "Growth & trends": "growth",
     "Trend & consistency": "trend",
     "Relative value": "relvalue",
+    "Fundamental history": "fundhist",
     "Solvency / distress": "solvency",
     "Earnings quality": "quality",
     "Technical": "technical",
+    "Corporate events": "events",
     "Classification": "classification",
 }
 
@@ -128,9 +130,18 @@ def test_rank_policy_adr_0016():
         "div_cuts_10y", "div_history_years_10y", "ni_change_scaled",
     } | {
         f"{series}_up_frac_{w}q"
-        for series in ("revenue", "tangibles", "ocf")
+        for series in ("revenue", "tangibles", "ocf", "bvps", "shares")
         for w in (4, 8, 12, 20)
-    } | {f"ocf_positive_frac_{w}q" for w in (4, 8, 12, 20)} | {
+    } | {
+        f"{series}_positive_frac_{w}q"
+        for series in ("ocf", "ni")
+        for w in (4, 8, 12, 20)
+    } | {
+        f"{series}_quarters_since_5y_peak"
+        for series in ("revenue", "netinc", "bvps")
+    } | {"ni_positive_years_10y", "ni_history_years_10y"} | {
+        s.name for s in FEATURES if s.family == "events"
+    } | {
         f"{r}_5y_pctile"
         for r in ("earnings_yield", "ocf_yield", "fcf_yield", "sales_yield",
                   "book_to_market", "tangible_book_to_market")
@@ -151,6 +162,14 @@ def test_rank_policy_adr_0016():
         # masses at raw 1: no cost of revenue / unchanged margin / no net debt
         "gross_margin": (1.0, 1.0), "gmi": (1.0, 0.5),
         "ev_to_marketcap": (1.0, 0.5),
+        # ADR 0023: unchanged share count; at the own 5y peak; the
+        # gross-margin masses carried into its 5y median / dispersion
+        "shares_trend_4q": (0.0, 0.5), "shares_trend_8q": (0.0, 0.5),
+        "shares_trend_12q": (0.0, 0.5), "shares_trend_20q": (0.0, 0.5),
+        "revenue_vs_5y_peak": (0.0, 1.0), "netinc_vs_5y_peak": (0.0, 1.0),
+        "bvps_vs_5y_peak": (0.0, 1.0),
+        "gross_margin_5y_median": (1.0, 1.0),
+        "gross_margin_5y_std": (0.0, 0.0),
     }
     assert {
         s.name: (s.pin_value, s.pin_rank) for s in FEATURES if s.rank == "pinned"

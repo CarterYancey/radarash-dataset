@@ -19,7 +19,10 @@ Synthetic weekday calendar 2015-01-01 .. 2021-12-31, six stocks:
   different calendar quarters (100 → 60 → 30 → 120 → 24 → 150), pinning
   the max-drawdown segment fold with hand-computed values.
 - WAVE (300006): a decaying sinusoid on a 5%/yr trend; its max drawdowns are
-  cross-checked against a brute-force daily scan for every snapshot.
+  cross-checked against a brute-force daily scan for every snapshot. It
+  does not trade 2017-02-10 .. 2017-05-19 (a halt across a quarter
+  boundary), so the forward-fill weighting of the decision-0022 path
+  labels is exercised on a resumed path as well as on delistings.
 
 SPY grows at exactly 8%/yr in SFP.
 """
@@ -75,6 +78,13 @@ def wave_price(day: date) -> float:
     # quarter depending on the snapshot — all three segment kinds decide.
     amplitude = 0.4 * math.exp(-t / 600)
     return 100.0 * 1.05 ** (t / 365.25) * (1 + amplitude * math.sin(2 * math.pi * t / 97))
+
+
+WAVE_HALT = (date(2017, 2, 10), date(2017, 5, 19))
+
+
+def wave_trades(day: date) -> bool:
+    return not WAVE_HALT[0] <= day <= WAVE_HALT[1]
 
 
 TICKERS_CSV = """\
@@ -143,7 +153,8 @@ def build_path_sep_rows() -> str:
     lines = []
     for day in weekdays(BASE, END):
         lines.append(f"DIP,{day},{dip_price(day)!r},{dip_price(day)!r},2026-07-01")
-        lines.append(f"WAVE,{day},{wave_price(day)!r},{wave_price(day)!r},2026-07-01")
+        if wave_trades(day):
+            lines.append(f"WAVE,{day},{wave_price(day)!r},{wave_price(day)!r},2026-07-01")
     return "\n".join(lines) + "\n"
 
 
@@ -527,7 +538,7 @@ def test_max_drawdown_matches_brute_force(labels_world):
     days = list(weekdays(BASE, END))
     series = {
         300005: [(d, dip_price(d)) for d in days],
-        300006: [(d, wave_price(d)) for d in days],
+        300006: [(d, wave_price(d)) for d in days if wave_trades(d)],
     }
     rows = query(
         labels_world,
@@ -556,6 +567,129 @@ def test_max_drawdown_matches_brute_force(labels_world):
             checked += 1
     # WAVE's swings make most paths draw down across quarter boundaries.
     assert checked > 400
+
+
+PATH_LABEL_COLUMNS = (
+    "max_runup", "days_to_max", "days_to_min", "path_avg_return",
+    "realized_vol", "spy_max_runup", "spy_max_drawdown",
+    "spy_max_drawdown_from_entry", "spy_path_avg_return",
+)
+
+
+def path_labels(data_dir: Path, permaticker: int, kind: str, quarter: date,
+                horizon: str):
+    cols = ", ".join(f"fwd_{horizon}_{c}" for c in PATH_LABEL_COLUMNS[:5])
+    return one_row(
+        data_dir,
+        "labels",
+        f"""
+        SELECT {cols} FROM {{t}}
+        WHERE permaticker = {permaticker} AND snapshot_kind = '{kind}'
+          AND quarter = DATE '{quarter}'
+        """,
+    )
+
+
+def test_path_labels_hand_checked(labels_world):
+    q2015 = date(2015, 1, 1)
+    # ZIG low: entry 10 on 2015-01-06 (calendar day 3), then 30, 50, 30 and
+    # the final 30 carried to the horizon end. 1y target 2016-01-06 = day
+    # 264, so the path is 262 days: 10 + 30 + 50 + 259 x 30 = 7860.
+    runup, to_max, to_min, avg_ret, vol = path_labels(
+        labels_world, 300003, "low", q2015, "1y"
+    )
+    assert (runup, to_max, to_min) == (pytest.approx(4.0), 2, 0)
+    assert avg_ret == pytest.approx(7860 / 262 / 10 - 1)
+    r2 = math.log(3) ** 2 + 2 * math.log(5 / 3) ** 2
+    assert vol == pytest.approx(math.sqrt(252 * r2 / 261))
+    # ZIG high: entry 50 on day 5, then one print at 30, frozen. The path
+    # never rises (run-up 0 on the entry day) and bottoms the next day.
+    runup, to_max, to_min, avg_ret, vol = path_labels(
+        labels_world, 300003, "high", q2015, "1y"
+    )
+    assert (runup, to_max, to_min) == (pytest.approx(0.0), 0, 1)
+    # 1y target 2016-01-08 = day 266: 50 + 261 x 30 over 262 days.
+    assert avg_ret == pytest.approx((50 + 261 * 30) / 262 / 50 - 1)
+    assert vol == pytest.approx(math.sqrt(252 * math.log(0.6) ** 2 / 261))
+    # DEAD: constant then delisted — nothing moves, ties resolve to entry.
+    assert path_labels(labels_world, 300002, "median", q2015, "2y") == (
+        pytest.approx(0.0), 0, 0, pytest.approx(0.0), pytest.approx(0.0),
+    )
+    # DIP from 2015-01-01 (entry 100), 2y (ends 2016-12-30): high 150
+    # first printed 2016-10-03 — after the low 24, first printed
+    # 2016-07-01 (the recovery ordering the two day counts encode).
+    runup, to_max, to_min, avg_ret, vol = path_labels(
+        labels_world, 300005, "median", q2015, "2y"
+    )
+    days = list(weekdays(BASE, END))
+    assert runup == pytest.approx(0.5)
+    assert to_max == days.index(date(2016, 10, 3))
+    assert to_min == days.index(date(2016, 7, 1))
+    # Unobservable horizon: NULL like every other label.
+    assert path_labels(labels_world, 300005, "high", date(2021, 10, 1), "1y") == (
+        None,) * 5
+
+
+def forward_filled(prints: dict[date, float], days: list[date]) -> list[float]:
+    """Forward-filled closes over `days` (the first day must be a print)."""
+    path, last = [], None
+    for d in days:
+        last = prints.get(d, last)
+        path.append(last)
+    return path
+
+
+def test_path_labels_match_brute_force(labels_world):
+    days = list(weekdays(BASE, END))
+    prints = {
+        300001: {d: grow_price(d) for d in days},
+        300002: {d: 50.0 for d in days if d <= date(2016, 6, 30)},
+        300003: dict(ZIG_PRICES),
+        300005: {d: dip_price(d) for d in days},
+        300006: {d: wave_price(d) for d in days if wave_trades(d)},
+    }
+    spy = {d: spy_price(d) for d in days}
+    select = ", ".join(
+        "[" + ", ".join(f"fwd_{h}y_{c}" for c in PATH_LABEL_COLUMNS) + "]"
+        for h in (1, 2, 3, 5)
+    )
+    rows = query(
+        labels_world, "labels",
+        f"SELECT permaticker, snapshot_date, {select} FROM {{t}}",
+    )
+    checked = halted = 0
+    for permaticker, snapshot_date, *stored in rows:
+        for years, got in zip((1, 2, 3, 5), stored):
+            target = add_years(snapshot_date, years)
+            if target > END:
+                assert got == [None] * len(PATH_LABEL_COLUMNS)
+                continue
+            window = [d for d in days if snapshot_date <= d <= target]
+            path = forward_filled(prints[permaticker], window)
+            entry = path[0]
+            r2 = sum(math.log(b / a) ** 2 for a, b in zip(path, path[1:]))
+            bench = forward_filled(spy, window)
+            want = (
+                max(path) / entry - 1,
+                path.index(max(path)),
+                path.index(min(path)),
+                sum(path) / len(path) / entry - 1,
+                math.sqrt(252 * r2 / (len(path) - 1)),
+                max(bench) / bench[0] - 1,
+                naive_max_drawdown(bench),
+                1 - min(bench) / bench[0],
+                sum(bench) / len(bench) / bench[0] - 1,
+            )
+            assert got == pytest.approx(want, rel=1e-9, abs=1e-12), (
+                permaticker, snapshot_date, years)
+            checked += 1
+            if permaticker == 300006 and any(
+                WAVE_HALT[0] <= d <= WAVE_HALT[1] for d in window
+            ):
+                halted += 1
+    assert checked > 600
+    # Paths crossing WAVE's halt pin the forward-fill weights mid-path.
+    assert halted > 30
 
 
 def test_missing_inputs(tmp_path):

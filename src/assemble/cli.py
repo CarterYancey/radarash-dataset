@@ -1,8 +1,8 @@
 """CLI: assemble the versioned training dataset (M5).
 
-    sharadar-assemble                           # writes data/datasets/dataset_v1.4/
-    sharadar-assemble --dataset-version 1.4.1   # same code, newer raw snapshot
-    make dataset VERSION=1.4.1                  # the same via make
+    sharadar-assemble                           # writes data/datasets/dataset_v1.5/
+    sharadar-assemble --dataset-version 1.5.1   # same code, newer raw snapshot
+    make dataset VERSION=1.5.1                  # the same via make
 
 Versioning (decision 0021): X.Y changes with the code/schema (bump
 DEFAULT_VERSION alongside the change); a rebuild of the same code on a new
@@ -50,7 +50,7 @@ from .wide import MIN_INDUSTRY_PEERS, RANK_GUARD, build_wide_views
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_VERSION = "1.4"
+DEFAULT_VERSION = "1.5"
 
 
 def build_parser() -> argparse.ArgumentParser:

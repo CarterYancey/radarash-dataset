@@ -101,6 +101,23 @@ NEG_FY2015_FLOWS = {
 }
 
 
+# 8-K item codes (events family, ADR 0024). BANK's 2014 row is out of the
+# universe but sets the export's first date: windows starting before
+# 2014-06-02 are uncovered. ACME files two rows on 2016-05-10 (one event
+# date), an 8-K on a snapshot date (2016-07-01) and one exactly 365 days
+# before the 2017-10-02 snapshot.
+EVENTS_CSV = """\
+date,ticker,eventcodes
+2014-06-02,BANK,22
+2016-02-10,ACME,"22,91"
+2016-05-10,ACME,22
+2016-05-10,ACME,"42,52"
+2016-07-01,ACME,31
+2016-10-02,ACME,26
+2017-02-01,GROW,"13|21"
+"""
+
+
 def sf1_rows(ticker: str, datekey: str, reportperiod: str, levels, flows):
     def row(dimension: str, fields: tuple, values: dict) -> str:
         cells = [str(values.get(f, "")) for f in fields]
@@ -188,6 +205,7 @@ def features_world(tmp_path_factory) -> Path:
         ("SEP", build_sep_csv()),
         ("SFP", build_sfp_csv()),
         ("ACTIONS", ACTIONS_CSV),
+        ("EVENTS", EVENTS_CSV),
     ):
         csv_path = data_dir / f"{name}_fixture.csv"
         csv_path.write_text(csv_text)
@@ -591,3 +609,65 @@ def test_classification(features_world):
 
 def test_missing_inputs(tmp_path):
     assert features_cli.main(["--data-dir", str(tmp_path)]) == 2
+
+
+EVENT_COLUMNS = (
+    "events_8k_days_12m, events_earnings_release_12m, "
+    "events_non_reliance_12m, events_officer_change_12m, "
+    "events_delisting_notice_12m, events_impairment_12m, "
+    "events_bankruptcy_12m"
+)
+
+
+def test_events_counts_and_window(features_world):
+    # 2016-07-01: 8-Ks of 2016-02-10 and 2016-05-10 (two rows, one event
+    # date: codes 22, 42, 52). The delisting notice filed on the snapshot
+    # date itself is not yet usable.
+    assert acme(features_world, "events", EVENT_COLUMNS, "2016-07-01") == (
+        2, 2, 1, 1, 0, 0, 0)
+    # 2016-10-03: plus the 2016-07-01 notice and the 2016-10-02 impairment.
+    assert acme(features_world, "events", EVENT_COLUMNS, "2016-10-03") == (
+        4, 2, 1, 1, 1, 1, 0)
+    # 2017-04-03: the window opens 2016-04-03 — the February 8-K is out.
+    assert acme(features_world, "events", EVENT_COLUMNS, "2017-04-03") == (
+        3, 1, 1, 1, 1, 1, 0)
+    # 2017-10-02: only the impairment, filed exactly 365 days before
+    # (the window's first day, inclusive).
+    assert acme(features_world, "events", EVENT_COLUMNS, "2017-10-02") == (
+        1, 0, 0, 0, 0, 1, 0)
+
+
+def test_events_null_outside_coverage_zero_inside(features_world):
+    # The export starts 2014-06-02: the 2015-04-01 window (from
+    # 2014-04-01) is uncovered -> NULL; 2015-07-01 is covered -> 0.
+    assert acme(features_world, "events", EVENT_COLUMNS, "2015-04-01") == (
+        None,) * 7
+    assert acme(features_world, "events", EVENT_COLUMNS, "2015-07-01") == (
+        0,) * 7
+
+
+def test_events_code_list_delimiters(features_world):
+    # GROW's "13|21": any delimiter, every run of digits is one code.
+    row = one_row(
+        features_world, "events",
+        """
+        SELECT events_8k_days_12m, events_bankruptcy_12m,
+               events_acquisition_12m, events_earnings_release_12m
+        FROM {t} WHERE permaticker = 400003 AND snapshot_kind = 'median'
+          AND snapshot_date BETWEEN DATE '2017-04-01' AND DATE '2017-06-30'
+        """,
+    )
+    assert row == (1, 1, 1, 0)
+
+
+def test_events_family_needs_events_input(features_world, tmp_path):
+    # Other families build without EVENTS; the events family refuses.
+    import shutil
+
+    data_dir = tmp_path / "data"
+    shutil.copytree(features_world / "raw", data_dir / "raw")
+    shutil.copytree(features_world / "interim", data_dir / "interim")
+    (data_dir / "raw" / "EVENTS.parquet").unlink()
+    args = ["--data-dir", str(data_dir), "--families"]
+    assert features_cli.main(args + ["valuation"]) == 0
+    assert features_cli.main(args + ["events"]) == 2

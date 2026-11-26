@@ -1,7 +1,7 @@
 # Canonical dataset definitions (M5)
 
 Produced by `sharadar-assemble` (`src/assemble/`), consuming
-`data/interim/labels.parquet`, the nine family parquets under
+`data/interim/labels.parquet`, the twelve family parquets under
 `data/interim/features/`, and the split artifacts. Output is one
 **versioned, immutable directory**:
 
@@ -25,7 +25,7 @@ explicitly; otherwise bump `--dataset-version`).
 `X.Y` is a code/schema release (`DEFAULT_VERSION` in `src/assemble/cli.py`);
 `X.Y.Z` is a patch, the same `X.Y` code rebuilt on a newer raw ingest. Each
 label names exactly one build. Pick the version at build time:
-`make all VERSION=1.4.1` (or `sharadar-assemble --dataset-version 1.4.1`).
+`make all VERSION=1.5.1` (or `sharadar-assemble --dataset-version 1.5.1`).
 
 ## `dataset.parquet` column groups, in order
 
