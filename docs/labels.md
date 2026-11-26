@@ -9,7 +9,10 @@ tables and the identity artifacts. Two outputs under `data/interim/`:
 Design decisions: snapshot dates in
 [decisions/0001](decisions/0001-quarterly-snapshot-dates.md), delisting
 convention in [decisions/0002](decisions/0002-delisting-return-convention.md),
-max drawdowns in [decisions/0017](decisions/0017-max-drawdown-label.md).
+max drawdowns in [decisions/0017](decisions/0017-max-drawdown-label.md),
+the rest of the full-path labels (run-up, timing, path average, realized
+volatility, benchmark path) in
+[decisions/0022](decisions/0022-full-path-labels.md).
 
 ## Snapshots
 
@@ -50,7 +53,26 @@ tickers resolved to permatickers by the mapping's price-coverage window.
   day is on the path, so it is ≥ 0 (0 = never closed below entry) and never
   exceeds the max drawdown; the two differ when the path rises before it
   falls.
-- **Benchmark**: SPY from SFP, identical entry/terminal conventions.
+- **Max run-up**: the best mark-to-market gain vs. the entry price over
+  the same path, `max(P) / entry_closeadj − 1` — bought on the snapshot
+  date, sold at the highest close before the horizon end. ≥ 0 (0 = never
+  closed above entry); the mirror of the max drawdown from entry. A plain
+  return, not annualized.
+- **Days to max / min**: trading days (market-calendar index) from the
+  snapshot date to the *first* close at the path's high / low. 0 = the
+  entry day itself. `days_to_min < days_to_max` reads "fell first, peaked
+  later".
+- **Path-average return**: the time-average of the forward path vs. entry,
+  `mean(P) / entry_closeadj − 1`, every trading day of
+  `[snapshot_date, horizon end]` weighted equally (halts and the
+  post-delisting stretch forward-filled). It is the expected simple return
+  of selling on a uniformly random day of the window, so no single
+  endpoint decides it.
+- **Realized volatility**: `sqrt(252 · Σ r² / n)` over the path's daily log
+  returns (uncentered; `n` = trading days after entry; forward-filled days
+  count as zero returns).
+- **Benchmark**: SPY from SFP, identical entry/terminal conventions, and
+  the same full-path statistics over the same window.
 - **Observability**: labels exist only when the nominal end date is on or
   before the last calendar date; otherwise every column for that horizon is
   NULL (delisted stocks included — the benchmark path is still unknown).
@@ -71,7 +93,16 @@ Keys and entry metadata as in `snapshots.parquet`, then per horizon `{H}`:
 | `fwd_{H}_max_cagr` | double | CAGR to the terminal-window maximum |
 | `fwd_{H}_max_drawdown` | double | max peak-to-trough fall over the whole forward path, positive fraction in [0, 1) (decision 0017) |
 | `fwd_{H}_max_drawdown_from_entry` | double | worst close over the whole forward path vs. entry, `1 − min / entry_closeadj`, in [0, 1) (decision 0017) |
+| `fwd_{H}_max_runup` | double | best close over the whole forward path vs. entry, `max / entry_closeadj − 1`, ≥ 0 (decision 0022) |
+| `fwd_{H}_days_to_max` | bigint | trading days from entry to the first close at the path high (decision 0022) |
+| `fwd_{H}_days_to_min` | bigint | trading days from entry to the first close at the path low (decision 0022) |
+| `fwd_{H}_path_avg_return` | double | time-average close over the whole forward path vs. entry, `mean / entry_closeadj − 1` (decision 0022) |
+| `fwd_{H}_realized_vol` | double | annualized volatility of the path's daily log returns (decision 0022) |
 | `fwd_{H}_spy_cagr` | double | SPY CAGR over the same window, same convention |
+| `fwd_{H}_spy_max_runup` | double | SPY's max run-up over the same window (decision 0022) |
+| `fwd_{H}_spy_max_drawdown` | double | SPY's max peak-to-trough fall over the same window (decision 0022) |
+| `fwd_{H}_spy_max_drawdown_from_entry` | double | SPY's worst close vs. its entry over the same window (decision 0022) |
+| `fwd_{H}_spy_path_avg_return` | double | SPY's path-average return over the same window (decision 0022) |
 | `fwd_{H}_excess_cagr` | double | `fwd_{H}_cagr` − `fwd_{H}_spy_cagr` |
 | `label_{H}_cagr_ge_0` | bool | `fwd_{H}_cagr ≥ 0%` |
 | `label_{H}_cagr_ge_5` | bool | `fwd_{H}_cagr ≥ 5%` |
@@ -92,17 +123,33 @@ straight from prices: each `fwd_{H}_*_cagr` equals
 (e.g. "3y max drawdown < 20%") are likewise derived downstream from
 `fwd_{H}_max_drawdown{,_from_entry}`; no drawdown binaries are stored
 (decision 0017). The path's lowest close is
-`entry_closeadj × (1 − fwd_{H}_max_drawdown_from_entry)`.
+`entry_closeadj × (1 − fwd_{H}_max_drawdown_from_entry)`, its highest
+`entry_closeadj × (1 + fwd_{H}_max_runup)`.
+
+The full-path columns are stored continuous for the same reason; targets
+built from them are one-liners downstream (decision 0022 lists more):
+
+| target | expression |
+|---|---|
+| endpoint-free "beat SPY" | `fwd_{H}_path_avg_return > fwd_{H}_spy_path_avg_return` |
+| upside reached at any point | `fwd_{H}_max_runup >= 0.5` |
+| upside/downside asymmetry | `fwd_{H}_max_runup / fwd_{H}_max_drawdown_from_entry` |
+| worse than the market's own dip | `fwd_{H}_max_drawdown_from_entry − fwd_{H}_spy_max_drawdown_from_entry` |
+| fell first, recovered later | `fwd_{H}_days_to_min < fwd_{H}_days_to_max` |
+| return per unit of risk | `fwd_{H}_cagr / fwd_{H}_realized_vol` |
 
 ## Module layout (two-stage, PLAN.md §6)
 
 1. **`paths`** — stage 1, path extraction: terminal-window daily price paths
    per (snapshot, horizon), and the full forward path compressed to
-   calendar-quarter segments of (max, min, inner drawdown) — all delisting
-   handling here and only here. Triple-barrier labels (v2) reuse the
+   calendar-quarter segments of (max, min, inner drawdown, where the
+   extremes first occur, time-weighted price sum, squared-return sum) —
+   all delisting handling here and only here. The benchmark's full path
+   is a plain range join (one series). Triple-barrier labels (v2) reuse the
    segments; the label functions below don't change.
 2. **`compute`** — stage 2, label functions: pure aggregations over the
-   extracted paths (max drawdown is an ordered fold over the segments).
+   extracted paths (max drawdown is an ordered fold over the segments;
+   the other path labels are max/min/sum folds).
 
 Supporting: `source` (permaticker-resolved prices, trading calendar,
 benchmark), `snapshots` (quarterly touch dates), `delistings` (final trade,

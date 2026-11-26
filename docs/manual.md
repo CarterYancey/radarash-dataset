@@ -14,7 +14,7 @@ this manual tells you how to *use* them together. Design rationale: PLAN.md.
 One versioned, immutable directory:
 
 ```
-dataset_v1.4/
+dataset_v1.5/
 ├── dataset.parquet       one row per snapshot: key, features, ranks, labels, weights
 ├── splits.parquet        role tags per (scheme, fold, horizon, snapshot)
 ├── split_folds.parquet   frozen fold manifest (boundaries + role counts)
@@ -83,7 +83,7 @@ Use the manifest to select feature columns — don't pattern-match names:
 ```python
 import json
 
-DATASET = "data/datasets/dataset_v1.4"
+DATASET = "data/datasets/dataset_v1.5"
 cols = json.load(open(f"{DATASET}/manifest.json"))["columns"]
 feature_cols = cols["features"] + cols["ranks"] + cols["sector_ranks"]
 ```
@@ -143,6 +143,34 @@ flag means "unknown" (e.g. no prior-year filing), not "failed". They answer "che
 cross-sectional ranks cannot; pair them with the level ranks rather than
 replacing them.
 
+**v1.5 adds two families and widens a third** (additive — no existing
+column changes):
+
+- **Fundamental history** (decision 0023) — today's fundamentals against
+  the stock's own record: the normal level, dispersion and current
+  z-score of ROA, ROE, gross and operating margin over 20 quarters
+  (`*_5y_median`, `*_5y_std`, `*_5y_z`); normalized earnings power
+  (`earnings_yield_5y_avg`, `…_10y_avg`, `…_5y_peak`,
+  `…_at_5y_median_margin`, and the OCF/FCF 5y averages); distance from
+  the own peak (`{revenue,netinc,bvps}_vs_5y_peak` with
+  `…_quarters_since_5y_peak`); earnings and revenue surprise
+  (`netinc_sue_8q`, `revenue_sue_8q`); the ten-year record
+  (`ni_positive_years_10y`, `{revenue,bvps,shares}_cagr_10y`). Read them
+  in pairs with the level features: a low `earnings_yield` with a high
+  `earnings_yield_5y_avg` and a recent `netinc_quarters_since_5y_peak` is
+  a dip; the same yield with a long slide is not.
+- **Trend** gains book value per share and share count
+  (`bvps_*`, `shares_trend_*`, `shares_up_frac_*`) and the loss history
+  `ni_positive_frac_{w}q`.
+- **Corporate events** (decision 0024) — trailing-year counts of 8-K
+  items from EVENTS (`events_*_12m`): restatement, auditor change,
+  delisting notice, impairment, unregistered share sales, and so on.
+  Counts, never ranked. NULL means "before the EVENTS export starts", 0
+  means "no such 8-K". **Check the per-year coverage of these columns on
+  your build before leaning on them** (TODO V8): 8-K item numbering
+  changed in August 2004, and a column that is structurally 0 or NULL in
+  early years is partly an era marker.
+
 Every feature is point-in-time: it reflects only information publicly
 available on or before `snapshot_date`. Do not "enrich" rows by joining
 anything computed from raw Sharadar tables unless you replicate that
@@ -169,6 +197,18 @@ Targets to choose from, per horizon (full definitions: [labels.md](labels.md)):
   (`label_3y_cagr_ge_10 AND fwd_3y_max_drawdown < 0.30`: compounded
   without a crash). Keep NULLs NULL. The comparison on a NULL drawdown is
   unobservable, not `False`.
+- **Full path** (v1.5, decision 0022): `fwd_{H}_max_runup` (best close vs.
+  entry — the upside mirror of the drawdown from entry),
+  `fwd_{H}_days_to_max` / `_days_to_min` (when the high and the low came),
+  `fwd_{H}_path_avg_return` (the average close over the whole window vs.
+  entry — no endpoint at all), `fwd_{H}_realized_vol`, and SPY's own
+  run-up, drawdowns and path average over the same window
+  (`fwd_{H}_spy_*`). Use them when a single horizon date is deciding too
+  much: a March 2017 entry whose 3y endpoint is March 2020 has a poor
+  `fwd_3y_cagr` but its `fwd_3y_path_avg_return` and `fwd_3y_max_runup`
+  record the three good years, and `fwd_3y_excess_cagr` /
+  `fwd_3y_path_avg_return − fwd_3y_spy_path_avg_return` show whether it
+  was the stock or the market. Derived targets: [labels.md](labels.md).
 - `delisted_in_window_{H}`: `'false'`, or the delist reason. A non-`'false'`
   value is a **labeled row like any other** (final price carried at 0% —
   decision 0002). Filtering these rows out reintroduces survivorship bias

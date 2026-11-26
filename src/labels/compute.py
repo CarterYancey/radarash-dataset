@@ -18,6 +18,23 @@ fractions over the forward path [snapshot_date, horizon end]:
   sold at the lowest close before the horizon end"). The entry day is on
   the path, so it is never negative; `0` = never closed below entry.
 
+Decision 0022 folds the same segments into five more path labels:
+
+- `max_runup` — the best mark-to-market gain vs. the entry price,
+  `path_max / entry_closeadj − 1` (≥ 0): the mirror of
+  `max_drawdown_from_entry`.
+- `days_to_max` / `days_to_min` — trading days (market-calendar index)
+  from entry to the *first* close at the path high / low.
+- `path_avg_return` — the time-average of the forward-filled path vs.
+  entry, `mean(P) / entry_closeadj − 1`: the expected simple return of an
+  exit on a uniformly random day of the window — no endpoint at all.
+- `realized_vol` — annualized volatility of the path's daily log returns,
+  `sqrt(252 · Σ r² / path days)` (uncentered; the flat post-delisting
+  stretch counts as zero-return days).
+
+and joins `paths.benchmark_path_stats` for the benchmark's own run-up,
+drawdowns and path average over the identical window.
+
 `delisted_in_window` is a single VARCHAR per horizon: 'false' when the
 security still traded at the horizon end, otherwise the delist reason itself
 (no separate reason column). NULL means the horizon is not yet observable —
@@ -50,6 +67,16 @@ CAGR_THRESHOLDS_PCT = (0, 5, 8, 10, 15, 20)
 EXCESS_THRESHOLDS_PCT = (5, 10)
 
 NOT_DELISTED = "false"
+
+# Full-path labels of decision 0022 (`fwd_{H}_{name}`), stock then benchmark.
+PATH_LABELS = (
+    "max_runup", "days_to_max", "days_to_min", "path_avg_return",
+    "realized_vol",
+)
+BENCHMARK_PATH_LABELS = (
+    "spy_max_runup", "spy_max_drawdown", "spy_max_drawdown_from_entry",
+    "spy_path_avg_return",
+)
 
 
 def build_label_views(
@@ -89,7 +116,19 @@ def build_label_views(
                    max(greatest(seg_dd,
                                 coalesce(1 - seg_min / prior_max, 0.0)))
                        AS max_drawdown,
-                   min(seg_min) AS path_min
+                   min(seg_min) AS path_min,
+                   max(seg_max) AS path_max,
+                   -- struct order = (price, then earliest index)
+                   -max({{'px': seg_max, 'nix': -seg_max_ix}}).nix
+                       - any_value(entry_ix) AS days_to_max,
+                   min({{'px': seg_min, 'ix': seg_min_ix}}).ix
+                       - any_value(entry_ix) AS days_to_min,
+                   sum(seg_wsum)
+                       / (any_value(end_ix) - any_value(entry_ix) + 1)
+                       AS path_avg,
+                   sqrt(252.0 * sum(seg_r2)
+                        / (any_value(end_ix) - any_value(entry_ix)))
+                       AS realized_vol
             FROM (
                 SELECT *,
                        max(seg_max) OVER (
@@ -128,6 +167,12 @@ def build_label_views(
                    dd.max_drawdown,
                    1 - dd.path_min / s.entry_closeadj
                        AS max_drawdown_from_entry,
+                   dd.path_max / s.entry_closeadj - 1 AS max_runup,
+                   dd.days_to_max, dd.days_to_min,
+                   dd.path_avg / s.entry_closeadj - 1 AS path_avg_return,
+                   dd.realized_vol,
+                   bp.spy_max_runup, bp.spy_max_drawdown,
+                   bp.spy_max_drawdown_from_entry, bp.spy_path_avg_return,
                    d.is_delisted, d.last_price_date, d.delist_reason
             FROM stock_stats st
             JOIN snapshots s USING (permaticker, snapshot_date, snapshot_kind)
@@ -136,13 +181,19 @@ def build_label_views(
                 USING (permaticker, snapshot_date, snapshot_kind, horizon_years)
             LEFT JOIN bench_stats b USING (snapshot_date, horizon_years)
             LEFT JOIN benchmark_entries e USING (snapshot_date)
+            LEFT JOIN benchmark_path_stats bp
+                USING (snapshot_date, horizon_years)
         )
         SELECT permaticker, snapshot_date, snapshot_kind, horizon_years,
                horizon_end,
                closeadj_avg, closeadj_p2p, closeadj_min, closeadj_max,
                fwd_cagr, fwd_cagr_p2p, fwd_min_cagr, fwd_max_cagr,
                max_drawdown, max_drawdown_from_entry,
+               max_runup, days_to_max, days_to_min,
+               path_avg_return, realized_vol,
                spy_cagr,
+               spy_max_runup, spy_max_drawdown,
+               spy_max_drawdown_from_entry, spy_path_avg_return,
                fwd_cagr - spy_cagr AS fwd_excess_cagr,
                {threshold_cols},
                fwd_cagr > spy_cagr AS beat_spy,
@@ -171,7 +222,15 @@ def build_label_views(
             f"any_value(l.max_drawdown) {flt} AS fwd_{tag}_max_drawdown",
             f"any_value(l.max_drawdown_from_entry) {flt} "
             f"AS fwd_{tag}_max_drawdown_from_entry",
+            *(
+                f"any_value(l.{col}) {flt} AS fwd_{tag}_{col}"
+                for col in PATH_LABELS
+            ),
             f"any_value(l.spy_cagr) {flt} AS fwd_{tag}_spy_cagr",
+            *(
+                f"any_value(l.{col}) {flt} AS fwd_{tag}_{col}"
+                for col in BENCHMARK_PATH_LABELS
+            ),
             f"any_value(l.fwd_excess_cagr) {flt} AS fwd_{tag}_excess_cagr",
             *(
                 f"any_value(l.cagr_ge_{pct}) {flt} AS label_{tag}_cagr_ge_{pct}"

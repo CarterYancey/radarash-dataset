@@ -8,6 +8,7 @@ Inputs (produced by `sharadar-ingest` and `sharadar-identity`):
     data/raw/SF1.parquet                  as-reported fundamentals
     data/raw/SEP.parquet                  daily prices
     data/raw/SFP.parquet                  benchmark (SPY) prices, market beta
+    data/raw/EVENTS.parquet               8-K item codes (events family)
     data/interim/ticker_permaticker.parquet
     data/interim/universe.parquet
 
@@ -34,6 +35,7 @@ from assemble.source import family_view
 from assemble.wide import MIN_INDUSTRY_PEERS, RANK_GUARD, build_wide_views
 from features.base import build_fund_base_view
 from features.cli import FAMILY_BUILDERS
+from features.events import build_event_window_view
 from features.history import build_fund_history_view
 from features.market import build_market_view
 from features.output import validate_family_columns, view_name
@@ -119,6 +121,9 @@ def main(argv: list[str] | None = None) -> int:
         "SF1": (raw_dir / "SF1.parquet", "sharadar-ingest --tables SF1"),
         "SEP": (raw_dir / "SEP.parquet", "sharadar-ingest --tables SEP"),
         "SFP": (raw_dir / "SFP.parquet", "sharadar-ingest --tables SFP"),
+        "EVENTS": (
+            raw_dir / "EVENTS.parquet", "sharadar-ingest --tables EVENTS"
+        ),
         "mapping": (
             interim_dir / "ticker_permaticker.parquet",
             "sharadar-identity",
@@ -153,6 +158,7 @@ def main(argv: list[str] | None = None) -> int:
             universe_parquet=inputs["universe"][0],
             snapshots_parquet=None,
             sfp_parquet=inputs["SFP"][0],
+            events_parquet=inputs["EVENTS"][0],
         )
         as_of = resolve_as_of(con, args.as_of)
         if as_of is None:
@@ -173,6 +179,7 @@ def main(argv: list[str] | None = None) -> int:
         build_fund_base_view(con, include_same_day_filings=True)
         build_fund_history_view(con, include_same_day_filings=True)
         build_market_view(con)
+        build_event_window_view(con, include_same_day_filings=True)
         for family in FAMILIES:
             FAMILY_BUILDERS[family](con)
             validate_family_columns(con, family)

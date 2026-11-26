@@ -1,4 +1,5 @@
-"""Point-in-time history resolution: `fund_history` and `div_history`.
+"""Point-in-time history resolution: `fund_history`, `div_history` and
+`annual_history`.
 
 Foundation views for the trend family (ADR 0015), built like `fund_base`
 but resolving a *set* of past filings per snapshot instead of aligned lag
@@ -15,15 +16,22 @@ columns:
   `prev_qoff = qoff + 1`), and for the relative-value family the bucket
   filing's own `netinc`, `fcf`, `equity`, `shares` (`sharesbas × sharefactor`),
   `bucket_datekey` and `bucket_reportperiod` (its historical market cap is
-  priced in src/features/relvalue.py).
+  priced in src/features/relvalue.py), and for the fundamental-history
+  family (ADR 0023) `gp`, `ebit`, `assets` and book value per share
+  `bvps = equity / shares` (NULL unless `shares > 0`), with `prev_netinc`,
+  `prev_bvps`, `prev_shares` alongside the other adjacent-quarter values.
 - **`div_history`** — one row per snapshot × fiscal-year offset `yoff`
   (0..9), same matching at 365.25-day spacing, carrying the TTM cash
   dividend `div_ttm = −ncfdiv` plus `prev_yoff`/`prev_div_ttm` and `streak_ok`
   (every year from yoff 0 to this one present and paying — the dividend
   streak is `count(streak_ok)`).
+- **`annual_history`** — one row per snapshot × fiscal-year offset `yoff`
+  (0..10: eleven observations span ten years of growth), same matching as
+  `div_history`, carrying TTM `netinc` and `revenue`, `shares` and `bvps`
+  (ADR 0023's ten-year record).
 
 Snapshots with no T0 filing (`fund_reportperiod` NULL) have no rows in
-either view; the trend family maps that to NULL features, never zero.
+any of these views; the trend family maps that to NULL features, never zero.
 """
 
 from __future__ import annotations
@@ -37,6 +45,13 @@ BUCKET_SLACK_DAYS = 30
 
 HISTORY_QUARTERS = 20  # deepest quarterly window (T5, ADR 0015)
 DIVIDEND_YEARS = 10  # dividend-record window (T10, ADR 0015)
+ANNUAL_YEARS = 10  # ten-year record: offsets 0..10 (T10, ADR 0023)
+
+# sharesbas × sharefactor, NULL unless positive (the ADR 0007 convention).
+_SHARES = (
+    "CASE WHEN f.l_sharesbas * f.l_sharefactor > 0"
+    " THEN f.l_sharesbas * f.l_sharefactor END"
+)
 
 
 def _bucket_cte(
@@ -100,6 +115,8 @@ def build_fund_history_view(
             "f.f_ncfo AS ncfo, f.f_netinc AS netinc, f.f_fcf AS fcf, "
             "f.l_equity AS equity, "
             "f.l_sharesbas * f.l_sharefactor AS shares, "
+            "f.f_gp AS gp, f.f_ebit AS ebit, f.l_assets AS assets, "
+            f"f.l_equity / ({_SHARES}) AS bvps, "
             "f.datekey AS bucket_datekey, "
             "f.reportperiod AS bucket_reportperiod"
         ),
@@ -112,7 +129,10 @@ def build_fund_history_view(
                lag(qoff) OVER w AS prev_qoff,
                lag(revenue) OVER w AS prev_revenue,
                lag(tangibles) OVER w AS prev_tangibles,
-               lag(ncfo) OVER w AS prev_ncfo
+               lag(ncfo) OVER w AS prev_ncfo,
+               lag(netinc) OVER w AS prev_netinc,
+               lag(bvps) OVER w AS prev_bvps,
+               lag(shares) OVER w AS prev_shares
         FROM buckets
         WINDOW w AS (
             PARTITION BY permaticker, snapshot_date, snapshot_kind
@@ -153,5 +173,23 @@ def build_fund_history_view(
                    ROWS UNBOUNDED PRECEDING
                ) AS streak_ok
         FROM ordered
+        """
+    )
+
+    ctes = _bucket_cte(
+        cutoff_op=cutoff_op,
+        spacing_days=YEAR_DAYS,
+        n_buckets=ANNUAL_YEARS + 1,
+        offset_name="yoff",
+        value_cols=(
+            "f.f_netinc AS netinc, f.f_revenue AS revenue, "
+            f"{_SHARES} AS shares, f.l_equity / ({_SHARES}) AS bvps"
+        ),
+    )
+    con.execute(
+        f"""
+        CREATE OR REPLACE TEMP VIEW annual_history AS
+        WITH {ctes}
+        SELECT * FROM buckets
         """
     )

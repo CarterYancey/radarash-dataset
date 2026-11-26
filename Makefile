@@ -1,6 +1,6 @@
 # Optional subset, e.g.: make ingest TABLES="TICKERS SEP"
 TABLES ?=
-# Dataset version, e.g.: make all VERSION=1.4.1 (decision 0021; default:
+# Dataset version, e.g.: make all VERSION=1.5.1 (decision 0021; default:
 # DEFAULT_VERSION in src/assemble/cli.py)
 VERSION ?=
 

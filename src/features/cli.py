@@ -8,6 +8,7 @@ Inputs (produced by `sharadar-ingest`, `sharadar-identity`, `sharadar-labels`):
     data/raw/SF1.parquet                  as-reported fundamentals
     data/raw/SEP.parquet                  daily prices
     data/raw/SFP.parquet                  benchmark (SPY) prices, market beta
+    data/raw/EVENTS.parquet               8-K item codes (events family only)
     data/interim/ticker_permaticker.parquet
     data/interim/universe.parquet
     data/interim/snapshots.parquet
@@ -28,6 +29,8 @@ import duckdb
 
 from .base import build_fund_base_view
 from .classification import build_classification_view
+from .events import build_event_window_view, build_events_view
+from .fundhist import build_fundhist_view
 from .growth import build_growth_view
 from .history import build_fund_history_view
 from .market import build_market_view
@@ -52,9 +55,11 @@ FAMILY_BUILDERS = {
     "growth": build_growth_view,
     "trend": build_trend_view,
     "relvalue": build_relvalue_view,
+    "fundhist": build_fundhist_view,
     "solvency": build_solvency_view,
     "quality": build_quality_view,
     "technical": build_technical_view,
+    "events": build_events_view,
     "classification": build_classification_view,
 }
 assert tuple(FAMILY_BUILDERS) == FAMILIES
@@ -105,13 +110,16 @@ def main(argv: list[str] | None = None) -> int:
         "universe (run `sharadar-identity`)": interim_dir / "universe.parquet",
         "snapshots (run `sharadar-labels`)": interim_dir / "snapshots.parquet",
     }
+    families = [f for f in FAMILIES if f in set(args.families)]
+    events_parquet = raw_dir / "EVENTS.parquet" if "events" in families else None
+    if events_parquet is not None:
+        inputs["EVENTS (run `sharadar-ingest --tables EVENTS`)"] = events_parquet
     missing = [f"{path} — {hint}" for hint, path in inputs.items() if not path.exists()]
     if missing:
         for line in missing:
             logger.error("missing input: %s", line)
         return 2
 
-    families = [f for f in FAMILIES if f in set(args.families)]
     con = duckdb.connect()
     try:
         # Streaming-friendly settings: output order is imposed at COPY time,
@@ -131,10 +139,13 @@ def main(argv: list[str] | None = None) -> int:
             universe_parquet=interim_dir / "universe.parquet",
             snapshots_parquet=interim_dir / "snapshots.parquet",
             sfp_parquet=raw_dir / "SFP.parquet",
+            events_parquet=events_parquet,
         )
         build_fund_base_view(con)
         build_fund_history_view(con)
         build_market_view(con)
+        if events_parquet is not None:
+            build_event_window_view(con)
 
         features_dir = interim_dir / "features"
         for family in families:

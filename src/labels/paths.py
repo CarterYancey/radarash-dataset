@@ -7,10 +7,15 @@ All delisting handling lives here and only here; the label functions in
   trading days), all the endpoint labels need.
 - `path_segments` — the *full* forward path from entry to horizon end,
   compressed to calendar-quarter segments carrying (max, min, max
-  drawdown). That triple is closed under concatenation, so path-dependent
-  labels (max drawdown and loss from entry today, triple-barrier later)
-  fold the segments in order instead of scanning a snapshot × day join
+  drawdown), where the extremes first occur, and two additive totals (the
+  time-weighted price sum and the sum of squared log returns). All of it
+  is closed under concatenation, so path-dependent labels (max drawdown,
+  loss from entry, max run-up, time to the high/low, path-average return,
+  realized volatility — decisions 0017/0022; triple-barrier later) fold
+  the segments in order instead of scanning a snapshot × day join
   (~2B rows at real scale).
+- `benchmark_path_stats` — the benchmark's own full-path extremes and
+  average per (snapshot_date, horizon), same conventions (decision 0022).
 
 Delisting convention (docs/decisions/0002): the forward price on any trading
 day is the security's most recent adjusted close on or before that day
@@ -44,8 +49,8 @@ def build_path_views(
     window_days: int = TERMINAL_WINDOW_TRADING_DAYS,
 ) -> None:
     """Create `horizon_ends`, `terminal_windows`, `forward_paths`,
-    `benchmark_paths`, `benchmark_entries`, and the full-path
-    `path_segments` (via `build_path_segment_views`)."""
+    `benchmark_paths`, `benchmark_entries`, `benchmark_path_stats`, and
+    the full-path `path_segments` (via `build_path_segment_views`)."""
     if any(int(h) < 1 for h in horizons):
         # path_segments relies on every horizon end landing in a later
         # calendar quarter than its snapshot date.
@@ -123,6 +128,46 @@ def build_path_views(
         ASOF LEFT JOIN benchmark_prices p ON sd.snapshot_date >= p.date
         """
     )
+    # The benchmark's full forward path per (snapshot_date, horizon): one
+    # series, so a plain range join over the forward-filled calendar is
+    # small (distinct snapshot dates × path days, ~20M rows at real scale).
+    # NULL when the benchmark has no price on or before the snapshot date.
+    con.execute(
+        """
+        CREATE OR REPLACE TEMP VIEW benchmark_path_stats AS
+        WITH ff AS (
+            SELECT c.ix, p.closeadj AS px
+            FROM trading_calendar c
+            ASOF LEFT JOIN benchmark_prices p ON c.date >= p.date
+        ),
+        ends AS (
+            SELECT h.snapshot_date, h.horizon_years,
+                   c.ix AS entry_ix, h.end_ix
+            FROM horizon_ends h
+            JOIN trading_calendar c ON c.date = h.snapshot_date
+        ),
+        walk AS (
+            SELECT e.snapshot_date, e.horizon_years, f.px,
+                   first_value(f.px) OVER w AS entry_px,
+                   max(f.px) OVER w AS run_max
+            FROM ends e
+            JOIN ff f ON f.ix BETWEEN e.entry_ix AND e.end_ix
+            WINDOW w AS (
+                PARTITION BY e.snapshot_date, e.horizon_years
+                ORDER BY f.ix
+                ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+            )
+        )
+        SELECT snapshot_date, horizon_years,
+               max(px) / min(entry_px) - 1 AS spy_max_runup,
+               CASE WHEN min(entry_px) IS NOT NULL
+                    THEN max(1 - px / run_max) END AS spy_max_drawdown,
+               1 - min(px) / min(entry_px) AS spy_max_drawdown_from_entry,
+               avg(px) / min(entry_px) - 1 AS spy_path_avg_return
+        FROM walk
+        GROUP BY snapshot_date, horizon_years
+        """
+    )
     build_path_segment_views(con)
 
 
@@ -143,6 +188,22 @@ def build_path_segment_views(con: duckdb.DuckDBPyConnection) -> None:
     per-row window aggregates over the stock's own prints; full-quarter
     stats are a GROUP BY. Nothing scales with snapshots × days.
 
+    Decision 0022 adds, per segment: the calendar index (`trading_calendar.ix`)
+    of the *first* print at the segment's max and at its min (`seg_max_ix`,
+    `seg_min_ix` — `max`/`min` over a (price, ∓ix) struct, so ties resolve
+    to the earliest day deterministically), and two additive totals:
+
+    - `seg_wsum` — Σ price × days-held over the segment's prints, where a
+      print is held until the next print (forward-fill; halts and quarter
+      boundaries included) and the path's last print is held through the
+      horizon end. Summed over a path's segments and divided by
+      `end_ix − entry_ix + 1` it is the time-average of the forward-filled
+      path — delisted stocks carry their final close to the horizon.
+    - `seg_r2` — Σ squared log returns arriving at the segment's prints
+      (the entry print's own return, which predates entry, excluded).
+
+    Every segment row repeats its path's `entry_ix` / `end_ix`.
+
     Delisting (decision 0002) needs no special case: the forward-filled
     path only ever repeats real prints, and past the final print it is
     flat, contributing no new peak or trough — so the stock's own prints
@@ -161,45 +222,73 @@ def build_path_segment_views(con: duckdb.DuckDBPyConnection) -> None:
         """
         CREATE OR REPLACE TEMP VIEW path_price_rows AS
         WITH r AS (
-            SELECT permaticker, date, closeadj AS px,
-                   date_trunc('quarter', date)::DATE AS block,
-                   max(closeadj) OVER pre AS pre_max,
-                   min(closeadj) OVER pre AS pre_min,
-                   max(closeadj) OVER suf AS suf_max,
-                   min(closeadj) OVER suf AS suf_min,
-                   min(closeadj) OVER (
-                       PARTITION BY permaticker, date_trunc('quarter', date)
-                       ORDER BY date
+            SELECT p.permaticker, p.date, c.ix, p.closeadj AS px,
+                   date_trunc('quarter', p.date)::DATE AS block,
+                   max({'px': p.closeadj, 'nix': -c.ix}) OVER pre AS pre_hi,
+                   min({'px': p.closeadj, 'ix': c.ix}) OVER pre AS pre_lo,
+                   max({'px': p.closeadj, 'nix': -c.ix}) OVER suf AS suf_hi,
+                   min({'px': p.closeadj, 'ix': c.ix}) OVER suf AS suf_lo,
+                   min(p.closeadj) OVER (
+                       PARTITION BY p.permaticker,
+                                    date_trunc('quarter', p.date)
+                       ORDER BY p.date
                        ROWS BETWEEN 1 FOLLOWING AND UNBOUNDED FOLLOWING
-                   ) AS next_min
-            FROM sep_resolved
+                   ) AS next_min,
+                   -- days this print is held: to the stock's next print
+                   -- (NULL on its last print — the exit row is re-weighted
+                   -- to the horizon end in `path_segments`)
+                   lead(c.ix) OVER stock - c.ix AS gap,
+                   coalesce(
+                       pow(ln(p.closeadj / lag(p.closeadj) OVER stock), 2),
+                       0.0) AS r2
+            FROM sep_resolved p
+            JOIN trading_calendar c ON c.date = p.date
             WINDOW
-                pre AS (PARTITION BY permaticker, date_trunc('quarter', date)
-                        ORDER BY date
+                stock AS (PARTITION BY p.permaticker ORDER BY p.date),
+                pre AS (PARTITION BY p.permaticker,
+                                     date_trunc('quarter', p.date)
+                        ORDER BY p.date
                         ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW),
-                suf AS (PARTITION BY permaticker, date_trunc('quarter', date)
-                        ORDER BY date
+                suf AS (PARTITION BY p.permaticker,
+                                     date_trunc('quarter', p.date)
+                        ORDER BY p.date
                         ROWS BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING)
         )
-        SELECT permaticker, date, block, px,
-               pre_max, pre_min,
-               max(1 - px / pre_max) OVER (
+        SELECT permaticker, date, ix, block, px, gap, r2,
+               pre_hi.px AS pre_max, pre_lo.px AS pre_min,
+               -pre_hi.nix AS pre_max_ix, pre_lo.ix AS pre_min_ix,
+               max(1 - px / pre_hi.px) OVER pre AS pre_dd,
+               suf_hi.px AS suf_max, suf_lo.px AS suf_min,
+               -suf_hi.nix AS suf_max_ix, suf_lo.ix AS suf_min_ix,
+               max(greatest(0.0, coalesce(1 - next_min / px, 0.0))) OVER suf
+                   AS suf_dd,
+               coalesce(sum(px * gap) OVER (
                    PARTITION BY permaticker, block ORDER BY date
-                   ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-               ) AS pre_dd,
-               suf_max, suf_min,
-               max(greatest(0.0, coalesce(1 - next_min / px, 0.0))) OVER (
+                   ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING
+               ), 0.0) AS pre_wsum_excl,
+               sum(px * coalesce(gap, 0)) OVER suf AS suf_wsum,
+               sum(r2) OVER pre AS pre_r2,
+               coalesce(sum(r2) OVER (
                    PARTITION BY permaticker, block ORDER BY date
-                   ROWS BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING
-               ) AS suf_dd
+                   ROWS BETWEEN 1 FOLLOWING AND UNBOUNDED FOLLOWING
+               ), 0.0) AS suf_r2_excl
         FROM r
+        WINDOW
+            pre AS (PARTITION BY permaticker, block ORDER BY date
+                    ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW),
+            suf AS (PARTITION BY permaticker, block ORDER BY date
+                    ROWS BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING)
         """
     )
     con.execute(
         """
         CREATE OR REPLACE TEMP VIEW path_price_blocks AS
         SELECT permaticker, block,
-               max(px) AS blk_max, min(px) AS blk_min, max(pre_dd) AS blk_dd
+               max(px) AS blk_max, min(px) AS blk_min, max(pre_dd) AS blk_dd,
+               -max({'px': px, 'nix': -ix}).nix AS blk_max_ix,
+               min({'px': px, 'ix': ix}).ix AS blk_min_ix,
+               sum(px * coalesce(gap, 0)) AS blk_wsum,
+               sum(r2) AS blk_r2
         FROM path_price_rows
         GROUP BY permaticker, block
         """
@@ -211,38 +300,57 @@ def build_path_segment_views(con: duckdb.DuckDBPyConnection) -> None:
         CREATE OR REPLACE TEMP VIEW path_segments AS
         WITH ends AS (
             SELECT s.permaticker, s.snapshot_date, s.snapshot_kind,
-                   h.horizon_years, h.horizon_end
+                   h.horizon_years, h.horizon_end, h.end_ix
             FROM snapshots s
             JOIN horizon_ends h USING (snapshot_date)
         ),
         anchored AS (
-            SELECT e.*, a.block AS entry_block,
-                   a.suf_max, a.suf_min, a.suf_dd
+            SELECT e.*, a.block AS entry_block, a.ix AS entry_ix,
+                   a.suf_max, a.suf_min, a.suf_dd,
+                   a.suf_max_ix, a.suf_min_ix, a.suf_wsum, a.suf_r2_excl
             FROM ends e
             JOIN path_price_rows a
               ON a.permaticker = e.permaticker AND a.date = e.snapshot_date
         ),
         bounded AS MATERIALIZED (
             SELECT a.*, z.block AS exit_block,
-                   z.pre_max, z.pre_min, z.pre_dd
+                   z.pre_max, z.pre_min, z.pre_dd,
+                   z.pre_max_ix, z.pre_min_ix, z.pre_wsum_excl, z.pre_r2,
+                   z.px AS exit_px, z.ix AS exit_ix,
+                   coalesce(z.gap, 0) AS exit_gap
             FROM anchored a
             ASOF JOIN path_price_rows z
               ON a.permaticker = z.permaticker AND a.horizon_end >= z.date
         )
+        -- Entry suffix. When the path never leaves the entry quarter
+        -- (delisted in it), the exit print is this segment's last print:
+        -- swap its natural weight for the hold to the horizon end.
         SELECT permaticker, snapshot_date, snapshot_kind, horizon_years,
+               entry_ix, end_ix,
                entry_block AS seg_block,
-               suf_max AS seg_max, suf_min AS seg_min, suf_dd AS seg_dd
+               suf_max AS seg_max, suf_min AS seg_min, suf_dd AS seg_dd,
+               suf_max_ix AS seg_max_ix, suf_min_ix AS seg_min_ix,
+               suf_wsum + CASE WHEN exit_block = entry_block
+                               THEN exit_px * (end_ix - exit_ix + 1 - exit_gap)
+                               ELSE 0 END AS seg_wsum,
+               suf_r2_excl AS seg_r2
         FROM bounded
         UNION ALL
         SELECT b.permaticker, b.snapshot_date, b.snapshot_kind,
-               b.horizon_years, k.block, k.blk_max, k.blk_min, k.blk_dd
+               b.horizon_years, b.entry_ix, b.end_ix,
+               k.block, k.blk_max, k.blk_min, k.blk_dd,
+               k.blk_max_ix, k.blk_min_ix, k.blk_wsum, k.blk_r2
         FROM bounded b
         JOIN path_price_blocks k
           ON k.permaticker = b.permaticker
          AND k.block > b.entry_block AND k.block < b.exit_block
         UNION ALL
         SELECT permaticker, snapshot_date, snapshot_kind, horizon_years,
-               exit_block, pre_max, pre_min, pre_dd
+               entry_ix, end_ix,
+               exit_block, pre_max, pre_min, pre_dd,
+               pre_max_ix, pre_min_ix,
+               pre_wsum_excl + exit_px * (end_ix - exit_ix + 1),
+               pre_r2
         FROM bounded
         WHERE exit_block > entry_block
         """

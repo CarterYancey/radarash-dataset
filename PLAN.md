@@ -124,6 +124,15 @@ final registry in `docs/features.md`):
    TICKERS metadata is current-state, not historical — reclassified firms get
    today's label retroactively; accepted v1 caveat with `siccode` as the
    era-stable fallback (edges spelled out in docs/features.md §Classification).
+8. **Fundamental history (v1.5, decision 0023):** today's fundamentals against
+   the stock's own record — normal level, dispersion and z-score of ROA, ROE
+   and margins over 20 quarters; normalized earnings power (5- and 10-year
+   average earnings over today's price); distance from the own 5-year peak;
+   seasonal-difference earnings surprise; the ten-year record.
+9. **Corporate events (v1.5, decision 0024):** trailing-year counts of 8-K
+   items from EVENTS (restatement, auditor change, delisting notice,
+   impairment, unregistered share sales, …) — the one family not derived
+   from SF1 or prices.
 
 **Feature representation:** every numeric feature is stored twice —
 raw value AND **cross-sectional rank (percentile) within snapshot date**
@@ -180,6 +189,11 @@ Additional stored columns per (snapshot, horizon):
   peak), and the worst close vs. entry ("bought here, sold at the bottom"), both
   positive fractions. Encode "got there without a catastrophic ride"; drawdown
   thresholds are derived downstream, not stored (`docs/decisions/0017`)
+- `fwd_{H}_max_runup`, `fwd_{H}_days_to_{max,min}`, `fwd_{H}_path_avg_return`,
+  `fwd_{H}_realized_vol` and the benchmark's `fwd_{H}_spy_*` path columns — the
+  rest of the full path: upside reached, when the extremes came, the
+  endpoint-free average outcome, and the market's own path over the same window
+  (`docs/decisions/0022`)
 - `fwd_{H}_closeadj_{avg,p2p,min,max}` — the raw terminal `closeadj` values behind
   the four CAGRs above, so any CAGR can be re-derived (or the convention changed)
   straight from prices

@@ -13,7 +13,8 @@ plus the annual dividend record over 10 fiscal years:
 - `{s}_up_frac_{w}q` — fraction of available adjacent-quarter pairs that
   increased; needs `MIN_POINTS[w] - 1` pairs.
 - `ocf_positive_frac_{w}q` — fraction of observations with `ncfo > 0`
-  (carries the OCF-sign signal exactly where the log trend is NULL).
+  (carries the OCF-sign signal exactly where the log trend is NULL);
+  `ni_positive_frac_{w}q` the same for TTM `netinc` (ADR 0023).
 - `fund_history_quarters` — observations present in the 20q window.
 - `div_*_10y` / `div_streak_10y` — years paid, current streak, cuts
   (TTM dividend below `DIVIDEND_CUT_RATIO ×` prior year's), years known.
@@ -39,7 +40,22 @@ SERIES: dict[str, str] = {
     "revenue": "revenue",
     "tangibles": "tangibles",
     "ocf": "ncfo",
+    # ADR 0023: per-share book value (compounding net of issuance) and the
+    # share count itself (dilution / buyback trajectory).
+    "bvps": "bvps",
+    "shares": "shares",
 }
+STATS: tuple[str, ...] = ("trend", "consistency", "up_frac")
+# Stats shipped per series (default: all). A share count is often exactly
+# constant, where r² degenerates to a mass at 1 — no consistency column.
+SERIES_STATS: dict[str, tuple[str, ...]] = {"shares": ("trend", "up_frac")}
+
+# feature-name prefix -> fund_history column, for `{name}_positive_frac_{w}q`
+POSITIVE_SERIES: dict[str, str] = {"ocf": "ncfo", "ni": "netinc"}
+
+
+def series_stats(name: str) -> tuple[str, ...]:
+    return SERIES_STATS.get(name, STATS)
 
 
 def _trend_exprs(name: str, col: str, w: int) -> list[str]:
@@ -59,24 +75,25 @@ def _trend_exprs(name: str, col: str, w: int) -> list[str]:
     )
     pairs = f"count(*) FILTER (WHERE {pair})"
     ups = f"count(*) FILTER (WHERE {pair} AND h.{col} > h.prev_{col})"
-    return [
-        f"CASE WHEN {fit_ok} THEN regr_slope({fit_args}) {fit_filter} END"
+    exprs = {
+        "trend": f"CASE WHEN {fit_ok} THEN regr_slope({fit_args}) {fit_filter} END"
         f" AS {name}_trend_{w}q",
-        f"CASE WHEN {fit_ok} THEN regr_r2({fit_args}) {fit_filter} END"
+        "consistency": f"CASE WHEN {fit_ok} THEN regr_r2({fit_args}) {fit_filter} END"
         f" AS {name}_consistency_{w}q",
-        f"CASE WHEN {pairs} >= {mp - 1}"
+        "up_frac": f"CASE WHEN {pairs} >= {mp - 1}"
         f" THEN CAST({ups} AS DOUBLE) / {pairs} END"
         f" AS {name}_up_frac_{w}q",
-    ]
+    }
+    return [exprs[stat] for stat in series_stats(name)]
 
 
-def _ocf_positive_expr(w: int) -> str:
-    nobs = f"count(*) FILTER (WHERE h.qoff < {w} AND h.ncfo IS NOT NULL)"
-    npos = f"count(*) FILTER (WHERE h.qoff < {w} AND h.ncfo > 0)"
+def _positive_expr(name: str, col: str, w: int) -> str:
+    nobs = f"count(*) FILTER (WHERE h.qoff < {w} AND h.{col} IS NOT NULL)"
+    npos = f"count(*) FILTER (WHERE h.qoff < {w} AND h.{col} > 0)"
     return (
         f"CASE WHEN {nobs} >= {MIN_POINTS[w]}"
         f" THEN CAST({npos} AS DOUBLE) / {nobs} END"
-        f" AS ocf_positive_frac_{w}q"
+        f" AS {name}_positive_frac_{w}q"
     )
 
 
@@ -88,7 +105,11 @@ def build_trend_view(con: duckdb.DuckDBPyConnection) -> None:
         for w in WINDOWS
         for expr in _trend_exprs(name, col, w)
     ]
-    q_exprs += [_ocf_positive_expr(w) for w in WINDOWS]
+    q_exprs += [
+        _positive_expr(name, col, w)
+        for name, col in POSITIVE_SERIES.items()
+        for w in WINDOWS
+    ]
     has_filing = "(b.fund_reportperiod IS NOT NULL)"
     q_exprs.append(
         f"CASE WHEN {has_filing} THEN count(h.qoff) END"
@@ -116,9 +137,13 @@ def build_trend_view(con: duckdb.DuckDBPyConnection) -> None:
         f"q.{name}_{stat}_{w}q"
         for name in SERIES
         for w in WINDOWS
-        for stat in ("trend", "consistency", "up_frac")
+        for stat in series_stats(name)
     ]
-    trend_cols += [f"q.ocf_positive_frac_{w}q" for w in WINDOWS]
+    trend_cols += [
+        f"q.{name}_positive_frac_{w}q"
+        for name in POSITIVE_SERIES
+        for w in WINDOWS
+    ]
     trend_cols.append("q.fund_history_quarters")
     trend_cols += [
         "d.div_years_paid_10y", "d.div_streak_10y", "d.div_cuts_10y",

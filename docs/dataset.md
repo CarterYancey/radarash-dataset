@@ -1,7 +1,7 @@
 # Canonical dataset definitions (M5)
 
 Produced by `sharadar-assemble` (`src/assemble/`), consuming
-`data/interim/labels.parquet`, the nine family parquets under
+`data/interim/labels.parquet`, the twelve family parquets under
 `data/interim/features/`, and the split artifacts. Output is one
 **versioned, immutable directory**:
 
@@ -25,7 +25,7 @@ explicitly; otherwise bump `--dataset-version`).
 `X.Y` is a code/schema release (`DEFAULT_VERSION` in `src/assemble/cli.py`);
 `X.Y.Z` is a patch, the same `X.Y` code rebuilt on a newer raw ingest. Each
 label names exactly one build. Pick the version at build time:
-`make all VERSION=1.4.1` (or `sharadar-assemble --dataset-version 1.4.1`).
+`make all VERSION=1.5.1` (or `sharadar-assemble --dataset-version 1.5.1`).
 
 ## `dataset.parquet` column groups, in order
 
@@ -56,7 +56,7 @@ docs/features.md notes):
 |---|---|---|
 | `full` | `_rank` (+ `_secrank` if allowlisted) | the percent rank above; continuous features |
 | `pinned` (mass at raw *v*, rank *r*) | same | rows at exactly *v* rank *r* in every quarter; the rest are percent-ranked within their side of the pin, below onto [0, *r*], above onto [*r*, 1] — the mass's rank is a fixed constant, not the quarter's share below it |
-| `none` | no rank columns | integer-valued composites, counts and shares (`piotroski_f`, `mohanram_g7`, `fundamentals_age_days`, `fund_history_quarters`, `div_*_10y`, `*_up_frac_*`, `ocf_positive_frac_*`, `*_5y_pctile`) and the bounded `ni_change_scaled` (masses at ±1 on every sign flip): the raw score is already cross-sectionally comparable |
+| `none` | no rank columns | integer-valued composites, counts and shares (`piotroski_f`, `mohanram_g7`, `fundamentals_age_days`, `fund_history_quarters`, `div_*_10y`, `*_up_frac_*`, `ocf_positive_frac_*`, `*_5y_pctile`) and the bounded `ni_change_scaled` (masses at ±1 on every sign flip) and `revenue_vs_5y_peak` (masses at 0 and −1): the raw score is already cross-sectionally comparable |
 
 Pins in v1.2 (mass at raw 0 unless stated): rank 0 for `dividend_yield`,
 `rnd_to_assets`, `capex_to_assets`, `debt_to_equity`, `sales_yield`,

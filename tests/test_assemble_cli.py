@@ -182,6 +182,7 @@ def assembled_world(tmp_path_factory) -> Path:
         ("SEP", build_sep_csv()),
         ("SFP", build_sfp_csv()),
         ("ACTIONS", ACTIONS_CSV),
+        ("EVENTS", 'date,ticker,eventcodes\n2013-01-02,MTWO,22\n2016-05-10,MONE,"22,52"\n2017-08-01,MTHR,42\n'),
     ):
         csv_path = data_dir / f"{name}_fixture.csv"
         csv_path.write_text(csv_text)
@@ -676,7 +677,7 @@ def test_manifest_provenance(assembled_world):
     # Fixture raw tables are written without ingest meta files.
     assert prov["raw_sources"] == {
         name: None
-        for name in ("ACTIONS", "SEP", "SF1", "SFP", "TICKERS")
+        for name in ("ACTIONS", "EVENTS", "SEP", "SF1", "SFP", "TICKERS")
     }
     assert set(prov["code"]) == {"git_commit", "git_dirty"}
     assert set(prov["files"]) == {

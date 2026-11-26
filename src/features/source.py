@@ -20,10 +20,14 @@ Everything downstream works from these temp views:
                          true one-day return).
 - `benchmark_ix`       — the benchmark's (SFP SPY) daily log returns on
                          the same calendar index, for market beta.
+- `events_resolved`    — EVENTS 8-K item codes, one row per (permaticker,
+                         date, code); `events_coverage` holds the export's
+                         first date (events family, ADR 0024). Only when an
+                         EVENTS parquet is passed.
 - `trading_calendar`   — market trading calendar (distinct SEP dates).
 - `universe`, `price_mapping` — identity artifacts, verbatim.
 
-SF1 rows carry only a ticker; resolution to permatickers follows the same
+SF1 and EVENTS rows carry only a ticker; resolution to permatickers follows the same
 rule as the QA pipeline (src/qa/source.py): unambiguous tickers resolve
 unconditionally, reused tickers go to the permaticker whose price-coverage
 window (widened by grace margins) contains the filing's datekey.
@@ -93,9 +97,13 @@ def create_feature_source_views(
     universe_parquet: Path,
     snapshots_parquet: Path | None,
     sfp_parquet: Path,
+    events_parquet: Path | None = None,
     benchmark_ticker: str = BENCHMARK_TICKER,
 ) -> None:
     """Create the source temp views over the raw and interim parquet files.
+
+    `events_parquet=None` skips `events_resolved` / `events_coverage` (a
+    features run that does not build the events family).
 
     `snapshots_parquet=None` skips the `snapshots` view: the inference
     pipeline (src/inference/) builds its own snapshot view from `sep_ix`
@@ -248,5 +256,63 @@ def create_feature_source_views(
         WHERE b.ticker = {sql_quote(benchmark_ticker)}
           AND b.closeadj IS NOT NULL AND b.closeadj > 0
         WINDOW w AS (ORDER BY c.ix)
+        """
+    )
+    if events_parquet is not None:
+        create_event_source_views(con, events_parquet)
+
+
+def create_event_source_views(
+    con: duckdb.DuckDBPyConnection, events_parquet: Path
+) -> None:
+    """Create `events_resolved` and `events_coverage` (needs `price_mapping`).
+
+    Tickers resolve like SF1 filings: unambiguous tickers unconditionally,
+    reused tickers to the permaticker whose price-coverage window (with the
+    same grace margins) contains the event date. `eventcodes` is a
+    delimited list of numeric codes; every run of digits is one code.
+    """
+    events = f"read_parquet({sql_quote(str(events_parquet))})"
+    con.execute(
+        f"""
+        CREATE OR REPLACE TEMP VIEW events_resolved AS
+        WITH candidates AS (
+            SELECT
+                m.permaticker, e.date, e.eventcodes,
+                row_number() OVER (
+                    PARTITION BY e.ticker, e.date, e.eventcodes
+                    ORDER BY CASE
+                        WHEN e.date
+                             BETWEEN coalesce(m.firstpricedate, DATE '0001-01-01')
+                                 AND coalesce(m.lastpricedate, DATE '9999-12-31')
+                        THEN 0
+                        ELSE least(
+                            abs(e.date - coalesce(m.firstpricedate, e.date)),
+                            abs(e.date - coalesce(m.lastpricedate, e.date))
+                        )
+                    END
+                ) AS rn
+            FROM {events} e
+            JOIN price_mapping m
+              ON e.ticker = m.ticker
+             AND (NOT m.ticker_is_reused
+                  OR (e.date >= coalesce(
+                          m.firstpricedate - {PRE_LISTING_GRACE_DAYS},
+                          DATE '0001-01-01')
+                      AND e.date <= coalesce(
+                          m.lastpricedate + {POST_DELISTING_GRACE_DAYS},
+                          DATE '9999-12-31')))
+            WHERE e.date IS NOT NULL AND e.eventcodes IS NOT NULL
+        )
+        SELECT DISTINCT c.permaticker, c.date, CAST(u.code AS INTEGER) AS code
+        FROM candidates c,
+             unnest(regexp_extract_all(c.eventcodes, '[0-9]+')) AS u(code)
+        WHERE c.rn = 1
+        """
+    )
+    con.execute(
+        f"""
+        CREATE OR REPLACE TEMP VIEW events_coverage AS
+        SELECT min(date) AS first_date FROM {events}
         """
     )
